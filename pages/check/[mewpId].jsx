@@ -149,6 +149,7 @@ export default function CheckPage({ mewpId }) {
   const [fnChecks, setFnChecks] = useState({});
   const [defects, setDefects] = useState({});
   const [submitError, setSubmitError] = useState("");
+  const [alreadyDoneFaults, setAlreadyDoneFaults] = useState([]);
 
   useEffect(() => {
     if (!mewpId) return;
@@ -165,6 +166,24 @@ export default function CheckPage({ mewpId }) {
     }
     load();
   }, [mewpId]);
+
+  useEffect(() => {
+    if (pageStatus === "already_done" && existingEntry?.daily_status === "fault" && existingEntry?.id) {
+      async function loadFaults() {
+        const { data } = await supabase.from("defect_log").select("item_number, defect_details, status").eq("entry_id", existingEntry.id);
+        if (data && data.length > 0) {
+          const faultsWithDesc = data.map(d => {
+            let description = `Item #${d.item_number}`;
+            for (const s of SECTIONS) { for (const i of s.items) { if (i.id === d.item_number) { description = i.text; break; } } }
+            for (const i of FUNCTION_CHECKS) { if (i.id === d.item_number) { description = i.text; break; } }
+            return { ...d, description };
+          });
+          setAlreadyDoneFaults(faultsWithDesc);
+        }
+      }
+      loadFaults();
+    }
+  }, [pageStatus]);
 
   async function handleSubmit() {
     setPageStatus("submitting");
@@ -220,6 +239,18 @@ export default function CheckPage({ mewpId }) {
           </div>
         </div>
         <div style={S.warningBox("#f0fdf4", "#bbf7d0", "#15803d")}>✅ No action needed. If you believe this is an error, contact your site manager.</div>
+        {existingEntry.daily_status === "fault" && alreadyDoneFaults.length > 0 && (
+          <div style={{ marginTop: "0.5rem" }}>
+            <div style={{ fontSize: "0.85rem", fontWeight: 800, color: "#b91c1c", marginBottom: "0.75rem", textTransform: "uppercase", letterSpacing: "0.04em" }}>⚠️ Faults Logged Today</div>
+            {alreadyDoneFaults.map(fault => (
+              <div key={fault.item_number} style={{ background: "#fef2f2", border: "2px solid #fecaca", borderRadius: "10px", padding: "0.85rem 1rem", marginBottom: "0.6rem" }}>
+                <div style={{ fontSize: "0.78rem", fontWeight: 800, color: "#b91c1c", marginBottom: "0.3rem" }}>Item #{String(fault.item_number).padStart(2, "0")} — {fault.description}</div>
+                <div style={{ fontSize: "0.9rem", color: "#7f1d1d", lineHeight: 1.5 }}>{fault.defect_details}</div>
+                <span style={{ display: "inline-block", marginTop: "0.4rem", fontSize: "0.65rem", fontWeight: 800, textTransform: "uppercase", padding: "0.15rem 0.5rem", borderRadius: "20px", background: fault.status === "repaired" ? "#bbf7d0" : fault.status === "open" ? "#fecaca" : "#fde68a", color: fault.status === "repaired" ? "#15803d" : fault.status === "open" ? "#991b1b" : "#92400e" }}>{fault.status}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

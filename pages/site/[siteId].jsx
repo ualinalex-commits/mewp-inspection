@@ -6,7 +6,7 @@ const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://yourapp.com";
 
 const S = {
   app: { minHeight: "100vh", background: "#f3f4f6", fontFamily: "system-ui, -apple-system, sans-serif", color: "#111827", paddingBottom: "4rem" },
-  logoBar: { background: "#1d4ed8", padding: "0.35rem 1rem", display: "flex", alignItems: "center", justifyContent: "center" },
+  logoBar: { background: "#fff", padding: "0.5rem", display: "flex", alignItems: "center", justifyContent: "center" },
   infoBar: { background: "#1d4ed8", padding: "0.75rem 1.25rem", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" },
   container: { maxWidth: "640px", margin: "0 auto", padding: "1rem" },
   card: { background: "#fff", borderRadius: "12px", overflow: "hidden", marginBottom: "1rem", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" },
@@ -125,7 +125,7 @@ function MEWPCard({ mewp, todayInspection, initialPdfUrl, isExpanded, onToggle }
   }
 
   return (
-    <div style={{ borderBottom: "1px solid #f3f4f6" }}>
+    <div>
       {/* Collapsed header — always visible */}
       <div
         style={{
@@ -342,23 +342,36 @@ export default function SiteDashboard({ siteId }) {
             <span style={S.cardHeadText}>MEWPs on Site</span>
             <button style={{ marginLeft: "auto", background: "#fff", color: "#1d4ed8", border: "none", borderRadius: "8px", padding: "0.4rem 0.85rem", fontSize: "0.8rem", fontWeight: 800, cursor: "pointer" }} onClick={() => setShowAddModal(true)}>+ Add</button>
           </div>
-          {mewps.length === 0 ? (
+          {mewps.length === 0 && (
             <div style={{ padding: "2.5rem", textAlign: "center" }}>
               <div style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}>🏗️</div>
               <div style={{ fontSize: "1rem", color: "#6b7280", marginBottom: "1.5rem", fontWeight: 600 }}>No MEWPs added yet</div>
               <button style={{ ...S.primaryBtn(), maxWidth: "220px", margin: "0 auto" }} onClick={() => setShowAddModal(true)}>+ Add First MEWP</button>
             </div>
-          ) : mewps.map(mewp => (
-            <MEWPCard
-              key={mewp.id}
-              mewp={mewp}
-              todayInspection={todayInspections[mewp.id] || null}
-              initialPdfUrl={sheetPdfUrls[mewp.id] || null}
-              isExpanded={expandedMewpId === mewp.id}
-              onToggle={() => handleToggle(mewp.id)}
-            />
-          ))}
+          )}
         </div>
+        {mewps.map(mewp => {
+          const expanded = expandedMewpId === mewp.id;
+          return (
+            <div key={mewp.id} style={{
+              background: "#fff",
+              borderRadius: "12px",
+              overflow: "hidden",
+              marginBottom: "0.5rem",
+              border: expanded ? "3px solid #1d4ed8" : "1px solid #f3f4f6",
+              boxShadow: expanded ? "0 0 0 3px rgba(29,78,216,0.15), 0 2px 8px rgba(0,0,0,0.1)" : "0 1px 3px rgba(0,0,0,0.08)",
+              transition: "border 0.2s, box-shadow 0.2s",
+            }}>
+              <MEWPCard
+                mewp={mewp}
+                todayInspection={todayInspections[mewp.id] || null}
+                initialPdfUrl={sheetPdfUrls[mewp.id] || null}
+                isExpanded={expanded}
+                onToggle={() => handleToggle(mewp.id)}
+              />
+            </div>
+          );
+        })}
         <div style={{ background: "#fff", borderRadius: "12px", padding: "1.25rem", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
           <div style={{ fontSize: "0.8rem", fontWeight: 800, color: "#1d4ed8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "1rem" }}>Setup Instructions</div>
           {[["1️⃣","Add each MEWP using the button above"],["2️⃣","Tap NFC Tag on each MEWP to get its unique QR code"],["3️⃣","Use NFC Tools app to write the URL to an NFC sticker"],["4️⃣","Attach the NFC sticker to the physical MEWP"],["5️⃣","Workers scan the tag each morning before operating"],["6️⃣","Weekly PDF auto-generates every Sunday to Google Drive"]].map(([n, text]) => (
