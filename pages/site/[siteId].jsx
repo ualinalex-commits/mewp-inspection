@@ -65,11 +65,36 @@ function AddMEWPModal({ siteId, onClose, onAdded }) {
   );
 }
 
-function MEWPCard({ mewp, todayInspection }) {
+function MEWPCard({ mewp, todayInspection, initialPdfUrl }) {
   const [showNFC, setShowNFC] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState(initialPdfUrl || null);
+  const [generating, setGenerating] = useState(false);
   const nfcUrl = mewp.nfc_url || `${BASE_URL}/check/${mewp.id}`;
   const hasFault = todayInspection?.daily_status === "fault";
+
   function copyNFC() { navigator.clipboard.writeText(nfcUrl); alert("NFC URL copied!"); }
+
+  async function handleGenerateReport() {
+    setGenerating(true);
+    try {
+      const res = await fetch("/api/generate-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mewp_id: mewp.id }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPdfUrl(data.pdf_url);
+      } else {
+        alert("Report failed: " + (data.error || "Unknown error"));
+      }
+    } catch (e) {
+      alert("Error: " + e.message);
+    } finally {
+      setGenerating(false);
+    }
+  }
+
   return (
     <div style={{ borderBottom: "1px solid #f3f4f6" }}>
       <div style={{ padding: "1rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
@@ -93,6 +118,18 @@ function MEWPCard({ mewp, todayInspection }) {
           <button style={S.ghostBtn()} onClick={copyNFC}>📋 Copy URL</button>
           <a href={nfcUrl} target="_blank" rel="noreferrer" style={{ ...S.ghostBtn("#1d4ed8"), textDecoration: "none" }}>Open Form ↗</a>
         </div>
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+          {pdfUrl && (
+            <a href={pdfUrl} target="_blank" rel="noreferrer" style={{ ...S.ghostBtn("#15803d"), textDecoration: "none" }}>📄 View PDF</a>
+          )}
+          <button
+            style={{ ...S.ghostBtn("#7c3aed"), opacity: generating ? 0.5 : 1 }}
+            onClick={handleGenerateReport}
+            disabled={generating}
+          >
+            {generating ? "Generating..." : pdfUrl ? "↻ Regenerate" : "📊 Generate Report"}
+          </button>
+        </div>
         {showNFC && (
           <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "10px", padding: "1.25rem", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.85rem" }}>
             <div style={{ fontSize: "0.75rem", color: "#6b7280", textAlign: "center", fontWeight: 600 }}>Programme NFC tag with this URL · Print QR for manual scan</div>
@@ -114,6 +151,7 @@ export default function SiteDashboard({ siteId }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showSiteQR, setShowSiteQR] = useState(false);
   const [stats, setStats] = useState({ total: 0, doneToday: 0, faultsToday: 0 });
+  const [sheetPdfUrls, setSheetPdfUrls] = useState({});
   const siteUrl = `${BASE_URL}/site/${siteId}`;
 
   useEffect(() => { if (siteId) loadData(); }, [siteId]);
@@ -131,6 +169,10 @@ export default function SiteDashboard({ siteId }) {
       (todayData || []).forEach(i => { inspMap[i.mewp_id] = i; });
       setTodayInspections(inspMap);
       setStats({ total: (mewpData || []).length, doneToday: (todayData || []).length, faultsToday: (todayData || []).filter(i => i.daily_status === "fault").length });
+      const { data: sheetData } = await supabase.from("weekly_inspection_sheets").select("mewp_id, pdf_url").eq("site_id", siteId).not("pdf_url", "is", null).order("week_commencing", { ascending: false });
+      const pdfMap = {};
+      (sheetData || []).forEach(s => { if (!pdfMap[s.mewp_id]) pdfMap[s.mewp_id] = s.pdf_url; });
+      setSheetPdfUrls(pdfMap);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   }
@@ -195,7 +237,7 @@ export default function SiteDashboard({ siteId }) {
               <div style={{ fontSize: "1rem", color: "#6b7280", marginBottom: "1.5rem", fontWeight: 600 }}>No MEWPs added yet</div>
               <button style={{ ...S.primaryBtn(), maxWidth: "220px", margin: "0 auto" }} onClick={() => setShowAddModal(true)}>+ Add First MEWP</button>
             </div>
-          ) : mewps.map(mewp => <MEWPCard key={mewp.id} mewp={mewp} todayInspection={todayInspections[mewp.id] || null} />)}
+          ) : mewps.map(mewp => <MEWPCard key={mewp.id} mewp={mewp} todayInspection={todayInspections[mewp.id] || null} initialPdfUrl={sheetPdfUrls[mewp.id] || null} />)}
         </div>
         <div style={{ background: "#fff", borderRadius: "12px", padding: "1.25rem", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
           <div style={{ fontSize: "0.8rem", fontWeight: 800, color: "#1d4ed8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "1rem" }}>Setup Instructions</div>
