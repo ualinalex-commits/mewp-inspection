@@ -240,6 +240,7 @@ export default function SiteDashboard({ siteId }) {
   return (
     <div style={S.app}>
       <div style={S.topbar}>
+        <img src="/logo.png" style={{ width: 36, height: 36, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
         <div><div style={S.topbarTitle}>🏗️ {site.name}</div><div style={S.topbarSub}>Site Manager Dashboard{site.location ? ` · ${site.location}` : ""}</div></div>
         <button style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: "8px", color: "#fff", padding: "0.5rem 0.75rem", cursor: "pointer", fontSize: "0.8rem", fontWeight: 700 }} onClick={loadData}>↻</button>
       </div>
