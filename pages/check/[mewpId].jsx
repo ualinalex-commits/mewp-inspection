@@ -224,18 +224,42 @@ export default function CheckPage({ mewpId }) {
     </div>
   );
 
-  if (pageStatus === "done") return (
-    <div style={S.app}>
-      <div style={{ ...S.topbar, background: faultCount > 0 ? "#b91c1c" : "#15803d" }}><div><div style={S.topbarTitle}>{faultCount > 0 ? "⚠️ Faults Logged" : "✅ Inspection Complete"}</div><div style={S.topbarSub}>{mewp?.machine_ref}</div></div></div>
-      <div style={{ ...S.container, textAlign: "center", paddingTop: "2rem" }}>
-        <div style={{ fontSize: "4rem", marginBottom: "1rem" }}>{faultCount > 0 ? "⚠️" : "✅"}</div>
-        <div style={{ fontSize: "1.3rem", fontWeight: 900, color: faultCount > 0 ? "#b91c1c" : "#15803d", marginBottom: "0.5rem" }}>{faultCount > 0 ? "Faults Logged" : "All Clear"}</div>
-        <div style={{ color: "#6b7280", marginBottom: "0.3rem" }}>{mewp?.machine_ref} · {mewp?.sites?.name}</div>
-        <div style={{ color: "#9ca3af", fontSize: "0.85rem" }}>{operator.name} · {todayLong}</div>
-        {faultCount > 0 && <div style={{ ...S.warningBox(), marginTop: "1.5rem", textAlign: "left" }}>⚠️ <strong>{faultCount} fault(s) logged.</strong> Report to your supervisor immediately. Do not operate until cleared.</div>}
+  if (pageStatus === "done") {
+    const doneFaults = [
+      ...SECTIONS.flatMap(s => s.items).filter(i => visual[i.id] === "fail").map(item => ({
+        id: item.id, text: item.text, detail: defects[item.id] || "Fault identified during pre-use inspection",
+      })),
+      ...FUNCTION_CHECKS.filter(i => fnChecks[i.id]?.ground === "fail" || fnChecks[i.id]?.platform === "fail").map(item => ({
+        id: item.id, text: item.text,
+        detail: defects[item.id] || `Fault on ${fnChecks[item.id]?.ground === "fail" && fnChecks[item.id]?.platform === "fail" ? "Ground and Platform" : fnChecks[item.id]?.ground === "fail" ? "Ground" : "Platform"} control`,
+      })),
+    ];
+    return (
+      <div style={S.app}>
+        <div style={{ ...S.topbar, background: faultCount > 0 ? "#b91c1c" : "#15803d" }}><div><div style={S.topbarTitle}>{faultCount > 0 ? "⚠️ Faults Logged" : "✅ Inspection Complete"}</div><div style={S.topbarSub}>{mewp?.machine_ref}</div></div></div>
+        <div style={{ ...S.container, paddingTop: "2rem" }}>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: "4rem", marginBottom: "1rem" }}>{faultCount > 0 ? "⚠️" : "✅"}</div>
+            <div style={{ fontSize: "1.3rem", fontWeight: 900, color: faultCount > 0 ? "#b91c1c" : "#15803d", marginBottom: "0.5rem" }}>{faultCount > 0 ? "Faults Logged" : "All Clear"}</div>
+            <div style={{ color: "#6b7280", marginBottom: "0.3rem" }}>{mewp?.machine_ref} · {mewp?.sites?.name}</div>
+            <div style={{ color: "#9ca3af", fontSize: "0.85rem" }}>{operator.name} · {todayLong}</div>
+            {faultCount > 0 && <div style={{ ...S.warningBox(), marginTop: "1.5rem", textAlign: "left" }}>⚠️ <strong>{faultCount} fault(s) logged.</strong> Report to your supervisor immediately. Do not operate until cleared.</div>}
+          </div>
+          {faultCount > 0 && doneFaults.length > 0 && (
+            <div style={{ marginTop: "1rem" }}>
+              <div style={{ fontSize: "0.85rem", fontWeight: 800, color: "#b91c1c", marginBottom: "0.75rem", textTransform: "uppercase", letterSpacing: "0.04em", textAlign: "left" }}>Faults Logged — Report to Supervisor</div>
+              {doneFaults.map(fault => (
+                <div key={fault.id} style={{ background: "#fef2f2", border: "2px solid #fecaca", borderRadius: "10px", padding: "0.85rem 1rem", marginBottom: "0.6rem" }}>
+                  <div style={{ fontSize: "0.78rem", fontWeight: 800, color: "#b91c1c", marginBottom: "0.3rem" }}>Item #{String(fault.id).padStart(2, "0")} — {fault.text}</div>
+                  <div style={{ fontSize: "0.9rem", color: "#7f1d1d", lineHeight: 1.5 }}>{fault.detail}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
 
   if (step === 0) return (
     <div style={S.app}>

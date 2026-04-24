@@ -6,7 +6,7 @@ const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://yourapp.com";
 
 const S = {
   app: { minHeight: "100vh", background: "#f3f4f6", fontFamily: "system-ui, -apple-system, sans-serif", color: "#111827", paddingBottom: "4rem" },
-  logoBar: { background: "#fff", padding: "1rem", display: "flex", alignItems: "center", justifyContent: "center" },
+  logoBar: { background: "#1d4ed8", padding: "0.35rem 1rem", display: "flex", alignItems: "center", justifyContent: "center" },
   infoBar: { background: "#1d4ed8", padding: "0.75rem 1.25rem", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" },
   container: { maxWidth: "640px", margin: "0 auto", padding: "1rem" },
   card: { background: "#fff", borderRadius: "12px", overflow: "hidden", marginBottom: "1rem", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" },
@@ -69,8 +69,33 @@ function MEWPCard({ mewp, todayInspection, initialPdfUrl, isExpanded, onToggle }
   const [showNFC, setShowNFC] = useState(false);
   const [pdfUrl, setPdfUrl] = useState(initialPdfUrl || null);
   const [generating, setGenerating] = useState(false);
+  const [faults, setFaults] = useState(null);
+  const [loadingFaults, setLoadingFaults] = useState(false);
   const nfcUrl = mewp.nfc_url || `${BASE_URL}/check/${mewp.id}`;
   const hasFault = todayInspection?.daily_status === "fault";
+
+  useEffect(() => {
+    if (isExpanded && hasFault && todayInspection?.id && faults === null) {
+      loadFaultsData();
+    }
+  }, [isExpanded]);
+
+  async function loadFaultsData() {
+    setLoadingFaults(true);
+    try {
+      const { data: defectData } = await supabase.from("defect_log").select("item_number, defect_details, status").eq("entry_id", todayInspection.id);
+      if (defectData && defectData.length > 0) {
+        const itemNums = defectData.map(d => d.item_number);
+        const { data: itemsData } = await supabase.from("check_items").select("item_number, description").in("item_number", itemNums);
+        const itemMap = {};
+        (itemsData || []).forEach(i => { itemMap[i.item_number] = i.description; });
+        setFaults(defectData.map(d => ({ ...d, description: itemMap[d.item_number] || `Item #${d.item_number}` })));
+      } else {
+        setFaults([]);
+      }
+    } catch (e) { console.error(e); setFaults([]); }
+    finally { setLoadingFaults(false); }
+  }
   const statusColor = todayInspection ? (hasFault ? "#dc2626" : "#15803d") : "#6b7280";
   const inspTime = todayInspection?.submitted_at
     ? new Date(todayInspection.submitted_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
@@ -137,7 +162,7 @@ function MEWPCard({ mewp, todayInspection, initialPdfUrl, isExpanded, onToggle }
       {/* Expandable body */}
       <div style={{
         overflow: "hidden",
-        maxHeight: isExpanded ? "800px" : "0",
+        maxHeight: isExpanded ? "1400px" : "0",
         transition: "max-height 0.35s ease",
       }}>
         <div style={{ padding: "0 1rem 1rem 1rem", display: "flex", flexDirection: "column", gap: "0.75rem", borderTop: "1px solid #f0f0f0" }}>
@@ -155,6 +180,22 @@ function MEWPCard({ mewp, todayInspection, initialPdfUrl, isExpanded, onToggle }
           ) : (
             <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "0.65rem 0.85rem", fontSize: "0.85rem", color: "#6b7280", fontWeight: 600, marginTop: "0.75rem" }}>
               ⏳ Not yet inspected today
+            </div>
+          )}
+
+          {hasFault && loadingFaults && (
+            <div style={{ fontSize: "0.82rem", color: "#b91c1c", padding: "0.5rem 0" }}>Loading fault details...</div>
+          )}
+          {hasFault && faults !== null && faults.length > 0 && (
+            <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "8px", padding: "0.85rem" }}>
+              <div style={{ fontSize: "0.8rem", fontWeight: 800, color: "#b91c1c", marginBottom: "0.65rem", textTransform: "uppercase", letterSpacing: "0.04em" }}>⚠️ Faults Logged Today</div>
+              {faults.map((fault, i) => (
+                <div key={fault.item_number} style={{ marginBottom: i < faults.length - 1 ? "0.65rem" : 0, paddingBottom: i < faults.length - 1 ? "0.65rem" : 0, borderBottom: i < faults.length - 1 ? "1px solid #fecaca" : "none" }}>
+                  <div style={{ fontSize: "0.78rem", fontWeight: 800, color: "#b91c1c" }}>Item #{String(fault.item_number).padStart(2, "0")} — {fault.description}</div>
+                  <div style={{ fontSize: "0.82rem", color: "#7f1d1d", marginTop: "0.25rem", lineHeight: 1.5 }}>{fault.defect_details}</div>
+                  <span style={{ display: "inline-block", marginTop: "0.3rem", fontSize: "0.65rem", fontWeight: 800, textTransform: "uppercase", padding: "0.15rem 0.5rem", borderRadius: "20px", background: fault.status === "repaired" ? "#bbf7d0" : fault.status === "open" ? "#fecaca" : "#fde68a", color: fault.status === "repaired" ? "#15803d" : fault.status === "open" ? "#991b1b" : "#92400e" }}>{fault.status}</span>
+                </div>
+              ))}
             </div>
           )}
 
