@@ -21,7 +21,7 @@ const S = {
 };
 
 function QRCanvas({ url, size=160 }) {
-  const canvasRef = useRef();
+  const canvasRef = useRef(null);
   useEffect(() => {
     if (canvasRef.current && url) {
       QRCode.toCanvas(canvasRef.current, url, { width: size, margin: 2, color: { dark: "#000", light: "#fff" } });
@@ -65,12 +65,16 @@ function AddMEWPModal({ siteId, onClose, onAdded }) {
   );
 }
 
-function MEWPCard({ mewp, todayInspection, initialPdfUrl }) {
+function MEWPCard({ mewp, todayInspection, initialPdfUrl, isExpanded, onToggle }) {
   const [showNFC, setShowNFC] = useState(false);
   const [pdfUrl, setPdfUrl] = useState(initialPdfUrl || null);
   const [generating, setGenerating] = useState(false);
   const nfcUrl = mewp.nfc_url || `${BASE_URL}/check/${mewp.id}`;
   const hasFault = todayInspection?.daily_status === "fault";
+  const statusColor = todayInspection ? (hasFault ? "#dc2626" : "#15803d") : "#6b7280";
+  const inspTime = todayInspection?.submitted_at
+    ? new Date(todayInspection.submitted_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+    : null;
 
   function copyNFC() { navigator.clipboard.writeText(nfcUrl); alert("NFC URL copied!"); }
 
@@ -97,47 +101,97 @@ function MEWPCard({ mewp, todayInspection, initialPdfUrl }) {
 
   return (
     <div style={{ borderBottom: "1px solid #f3f4f6" }}>
-      <div style={{ padding: "1rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div>
-            <div style={{ fontSize: "1rem", fontWeight: 900, color: "#111827", marginBottom: "0.2rem" }}>{mewp.machine_ref}</div>
-            {mewp.model && <div style={{ fontSize: "0.8rem", color: "#6b7280" }}>{mewp.model}{mewp.serial_number ? ` · ${mewp.serial_number}` : ""}</div>}
-          </div>
-          <span style={S.statPill(todayInspection ? (hasFault ? "#dc2626" : "#15803d") : "#6b7280")}>
-            {todayInspection ? (hasFault ? "⚠️ Faults" : "✅ Done") : "⏳ Pending"}
-          </span>
-        </div>
-        {todayInspection && (
-          <div style={{ background: hasFault ? "#fef2f2" : "#f0fdf4", border: `1px solid ${hasFault ? "#fecaca" : "#bbf7d0"}`, borderRadius: "8px", padding: "0.65rem 0.85rem", fontSize: "0.85rem", color: hasFault ? "#b91c1c" : "#15803d", fontWeight: 600 }}>
-            {hasFault ? "⚠️ Faults found" : "✅ All clear"} — {todayInspection.operator_name}
-            <span style={{ color: "#9ca3af", fontWeight: 400, marginLeft: "0.5rem" }}>{new Date(todayInspection.submitted_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</span>
-          </div>
-        )}
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-          <button style={S.ghostBtn("#1d4ed8")} onClick={() => setShowNFC(!showNFC)}>{showNFC ? "Hide NFC" : "📱 NFC Tag"}</button>
-          <button style={S.ghostBtn()} onClick={copyNFC}>📋 Copy URL</button>
-          <a href={nfcUrl} target="_blank" rel="noreferrer" style={{ ...S.ghostBtn("#1d4ed8"), textDecoration: "none" }}>Open Form ↗</a>
-        </div>
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
-          {pdfUrl && (
-            <a href={pdfUrl} target="_blank" rel="noreferrer" style={{ ...S.ghostBtn("#15803d"), textDecoration: "none" }}>📄 View PDF</a>
+      {/* Collapsed header — always visible, tappable */}
+      <div
+        onClick={onToggle}
+        style={{
+          minHeight: "64px",
+          padding: "0 1rem",
+          display: "flex",
+          alignItems: "center",
+          gap: "0.75rem",
+          cursor: "pointer",
+          userSelect: "none",
+          background: isExpanded ? "#f8faff" : "#fff",
+          transition: "background 0.2s",
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: "1.05rem", fontWeight: 900, color: "#111827" }}>{mewp.machine_ref}</div>
+          {(mewp.model || mewp.serial_number) && (
+            <div style={{ fontSize: "0.78rem", color: "#9ca3af", marginTop: "0.1rem" }}>
+              {[mewp.model, mewp.serial_number].filter(Boolean).join(" · ")}
+            </div>
           )}
-          <button
-            style={{ ...S.ghostBtn("#7c3aed"), opacity: generating ? 0.5 : 1 }}
-            onClick={handleGenerateReport}
-            disabled={generating}
-          >
-            {generating ? "Generating..." : pdfUrl ? "↻ Regenerate" : "📊 Generate Report"}
-          </button>
         </div>
-        {showNFC && (
-          <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "10px", padding: "1.25rem", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.85rem" }}>
-            <div style={{ fontSize: "0.75rem", color: "#6b7280", textAlign: "center", fontWeight: 600 }}>Programme NFC tag with this URL · Print QR for manual scan</div>
-            <QRCanvas url={nfcUrl} size={160} />
-            <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "0.6rem 0.85rem", fontSize: "0.65rem", color: "#6b7280", wordBreak: "break-all", textAlign: "center", width: "100%", boxSizing: "border-box" }}>{nfcUrl}</div>
-            <div style={{ fontSize: "0.75rem", color: "#9ca3af", textAlign: "center", lineHeight: 1.6 }}>Recommended: NTAG213 or NTAG215 · Use NFC Tools app</div>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.2rem", flexShrink: 0 }}>
+          <span style={S.statPill(statusColor)}>
+            {todayInspection ? (hasFault ? "⚠️ Faults" : `✅ Done${inspTime ? ` ${inspTime}` : ""}`) : "⏳ Pending"}
+          </span>
+          {todayInspection?.operator_name && (
+            <span style={{ fontSize: "0.72rem", color: "#6b7280" }}>{todayInspection.operator_name}</span>
+          )}
+        </div>
+        <div style={{
+          color: "#9ca3af",
+          fontSize: "0.8rem",
+          fontWeight: 700,
+          flexShrink: 0,
+          transition: "transform 0.25s ease",
+          transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+        }}>▼</div>
+      </div>
+
+      {/* Expandable body */}
+      <div style={{
+        overflow: "hidden",
+        maxHeight: isExpanded ? "700px" : "0",
+        transition: "max-height 0.35s ease",
+      }}>
+        <div style={{ padding: "0 1rem 1rem 1rem", display: "flex", flexDirection: "column", gap: "0.75rem", borderTop: "1px solid #f0f0f0" }}>
+          {/* Inspection status detail */}
+          {todayInspection ? (
+            <div style={{ background: hasFault ? "#fef2f2" : "#f0fdf4", border: `1px solid ${hasFault ? "#fecaca" : "#bbf7d0"}`, borderRadius: "8px", padding: "0.65rem 0.85rem", fontSize: "0.85rem", color: hasFault ? "#b91c1c" : "#15803d", fontWeight: 600, marginTop: "0.75rem" }}>
+              {hasFault ? "⚠️ Faults found" : "✅ All clear"} — {todayInspection.operator_name}
+              {inspTime && <span style={{ color: "#9ca3af", fontWeight: 400, marginLeft: "0.5rem" }}>{inspTime}</span>}
+            </div>
+          ) : (
+            <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "0.65rem 0.85rem", fontSize: "0.85rem", color: "#6b7280", fontWeight: 600, marginTop: "0.75rem" }}>
+              ⏳ Not yet inspected today
+            </div>
+          )}
+
+          {/* Report buttons */}
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+            <button
+              style={{ ...S.ghostBtn("#7c3aed"), opacity: generating ? 0.5 : 1 }}
+              onClick={handleGenerateReport}
+              disabled={generating}
+            >
+              {generating ? "Generating..." : pdfUrl ? "↻ Regenerate" : "📊 Generate Report"}
+            </button>
+            {pdfUrl && (
+              <a href={pdfUrl} target="_blank" rel="noreferrer" style={{ ...S.ghostBtn("#15803d"), textDecoration: "none" }}>📄 View PDF</a>
+            )}
           </div>
-        )}
+
+          {/* Action buttons */}
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+            <button style={S.ghostBtn("#1d4ed8")} onClick={() => setShowNFC(!showNFC)}>{showNFC ? "Hide NFC" : "📱 NFC Tag"}</button>
+            <button style={S.ghostBtn()} onClick={copyNFC}>📋 Copy URL</button>
+            <a href={nfcUrl} target="_blank" rel="noreferrer" style={{ ...S.ghostBtn("#1d4ed8"), textDecoration: "none" }}>Open Form ↗</a>
+          </div>
+
+          {/* NFC QR panel */}
+          {showNFC && (
+            <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "10px", padding: "1.25rem", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.85rem" }}>
+              <div style={{ fontSize: "0.75rem", color: "#6b7280", textAlign: "center", fontWeight: 600 }}>Programme NFC tag with this URL · Print QR for manual scan</div>
+              <QRCanvas url={nfcUrl} size={160} />
+              <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "0.6rem 0.85rem", fontSize: "0.65rem", color: "#6b7280", wordBreak: "break-all", textAlign: "center", width: "100%", boxSizing: "border-box" }}>{nfcUrl}</div>
+              <div style={{ fontSize: "0.75rem", color: "#9ca3af", textAlign: "center", lineHeight: 1.6 }}>Recommended: NTAG213 or NTAG215 · Use NFC Tools app</div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
