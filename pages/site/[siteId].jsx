@@ -6,9 +6,8 @@ const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://yourapp.com";
 
 const S = {
   app: { minHeight: "100vh", background: "#f3f4f6", fontFamily: "system-ui, -apple-system, sans-serif", color: "#111827", paddingBottom: "4rem" },
-  topbar: { background: "#1d4ed8", padding: "1rem 1.25rem", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" },
-  topbarTitle: { fontSize: "0.85rem", fontWeight: 800, color: "#fff" },
-  topbarSub: { fontSize: "0.7rem", color: "#93c5fd" },
+  logoBar: { background: "#fff", padding: "1rem", display: "flex", alignItems: "center", justifyContent: "center" },
+  infoBar: { background: "#1d4ed8", padding: "0.75rem 1.25rem", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" },
   container: { maxWidth: "640px", margin: "0 auto", padding: "1rem" },
   card: { background: "#fff", borderRadius: "12px", overflow: "hidden", marginBottom: "1rem", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" },
   cardHead: (color="#1d4ed8") => ({ background: color, padding: "0.75rem 1rem", display: "flex", alignItems: "center", gap: "0.6rem" }),
@@ -18,6 +17,7 @@ const S = {
   primaryBtn: (color="#1d4ed8") => ({ width: "100%", background: color, color: "#fff", border: "none", borderRadius: "12px", padding: "1rem", fontSize: "1rem", fontWeight: 800, cursor: "pointer", fontFamily: "system-ui, sans-serif", boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }),
   ghostBtn: (color="#374151") => ({ background: "#fff", color, border: `2px solid ${color}33`, borderRadius: "10px", padding: "0.65rem 1rem", fontSize: "0.82rem", fontWeight: 700, cursor: "pointer", fontFamily: "system-ui, sans-serif", whiteSpace: "nowrap" }),
   statPill: (color) => ({ background: `${color}15`, border: `2px solid ${color}30`, color, fontSize: "0.72rem", fontWeight: 800, padding: "0.3rem 0.75rem", borderRadius: "20px", textTransform: "uppercase" }),
+  detailsBtn: { background: "#fff", color: "#1d4ed8", border: "2px solid #1d4ed8", borderRadius: "8px", padding: "0.35rem 0.85rem", fontSize: "0.78rem", fontWeight: 700, cursor: "pointer", fontFamily: "system-ui, sans-serif", whiteSpace: "nowrap", flexShrink: 0 },
 };
 
 function QRCanvas({ url, size=160 }) {
@@ -101,17 +101,14 @@ function MEWPCard({ mewp, todayInspection, initialPdfUrl, isExpanded, onToggle }
 
   return (
     <div style={{ borderBottom: "1px solid #f3f4f6" }}>
-      {/* Collapsed header — always visible, tappable */}
+      {/* Collapsed header — always visible */}
       <div
-        onClick={onToggle}
         style={{
           minHeight: "64px",
           padding: "0 1rem",
           display: "flex",
           alignItems: "center",
           gap: "0.75rem",
-          cursor: "pointer",
-          userSelect: "none",
           background: isExpanded ? "#f8faff" : "#fff",
           transition: "background 0.2s",
         }}
@@ -132,28 +129,28 @@ function MEWPCard({ mewp, todayInspection, initialPdfUrl, isExpanded, onToggle }
             <span style={{ fontSize: "0.72rem", color: "#6b7280" }}>{todayInspection.operator_name}</span>
           )}
         </div>
-        <div style={{
-          color: "#9ca3af",
-          fontSize: "0.8rem",
-          fontWeight: 700,
-          flexShrink: 0,
-          transition: "transform 0.25s ease",
-          transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
-        }}>▼</div>
+        <button style={S.detailsBtn} onClick={onToggle}>
+          {isExpanded ? "Close" : "Details"}
+        </button>
       </div>
 
       {/* Expandable body */}
       <div style={{
         overflow: "hidden",
-        maxHeight: isExpanded ? "700px" : "0",
+        maxHeight: isExpanded ? "800px" : "0",
         transition: "max-height 0.35s ease",
       }}>
         <div style={{ padding: "0 1rem 1rem 1rem", display: "flex", flexDirection: "column", gap: "0.75rem", borderTop: "1px solid #f0f0f0" }}>
           {/* Inspection status detail */}
           {todayInspection ? (
-            <div style={{ background: hasFault ? "#fef2f2" : "#f0fdf4", border: `1px solid ${hasFault ? "#fecaca" : "#bbf7d0"}`, borderRadius: "8px", padding: "0.65rem 0.85rem", fontSize: "0.85rem", color: hasFault ? "#b91c1c" : "#15803d", fontWeight: 600, marginTop: "0.75rem" }}>
-              {hasFault ? "⚠️ Faults found" : "✅ All clear"} — {todayInspection.operator_name}
-              {inspTime && <span style={{ color: "#9ca3af", fontWeight: 400, marginLeft: "0.5rem" }}>{inspTime}</span>}
+            <div style={{ background: hasFault ? "#fef2f2" : "#f0fdf4", border: `1px solid ${hasFault ? "#fecaca" : "#bbf7d0"}`, borderRadius: "8px", padding: "0.65rem 0.85rem", marginTop: "0.75rem" }}>
+              <div style={{ fontSize: "0.85rem", color: hasFault ? "#b91c1c" : "#15803d", fontWeight: 600 }}>
+                {hasFault ? "⚠️ Faults found" : "✅ All clear"} — {todayInspection.operator_name}
+                {inspTime && <span style={{ color: "#9ca3af", fontWeight: 400, marginLeft: "0.5rem" }}>{inspTime}</span>}
+              </div>
+              {todayInspection.pal_card_number && (
+                <div style={{ fontSize: "0.78rem", color: "#6b7280", marginTop: "0.25rem" }}>PAL Card: {todayInspection.pal_card_number}</div>
+              )}
             </div>
           ) : (
             <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "0.65rem 0.85rem", fontSize: "0.85rem", color: "#6b7280", fontWeight: 600, marginTop: "0.75rem" }}>
@@ -164,14 +161,14 @@ function MEWPCard({ mewp, todayInspection, initialPdfUrl, isExpanded, onToggle }
           {/* Report buttons */}
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
             <button
-              style={{ ...S.ghostBtn("#7c3aed"), opacity: generating ? 0.5 : 1 }}
+              style={{ background: "#fff", color: "#7c3aed", border: "2px solid #7c3aed55", borderRadius: "10px", padding: "0.65rem 1rem", fontSize: "0.82rem", fontWeight: 700, cursor: "pointer", fontFamily: "system-ui, sans-serif", whiteSpace: "nowrap", opacity: generating ? 0.5 : 1 }}
               onClick={handleGenerateReport}
               disabled={generating}
             >
               {generating ? "Generating..." : pdfUrl ? "↻ Regenerate" : "📊 Generate Report"}
             </button>
             {pdfUrl && (
-              <a href={pdfUrl} target="_blank" rel="noreferrer" style={{ ...S.ghostBtn("#15803d"), textDecoration: "none" }}>📄 View PDF</a>
+              <a href={pdfUrl} target="_blank" rel="noreferrer" style={{ background: "#fff", color: "#15803d", border: "2px solid #15803d55", borderRadius: "10px", padding: "0.65rem 1rem", fontSize: "0.82rem", fontWeight: 700, cursor: "pointer", fontFamily: "system-ui, sans-serif", whiteSpace: "nowrap", textDecoration: "none" }}>📄 View PDF</a>
             )}
           </div>
 
@@ -206,9 +203,14 @@ export default function SiteDashboard({ siteId }) {
   const [showSiteQR, setShowSiteQR] = useState(false);
   const [stats, setStats] = useState({ total: 0, doneToday: 0, faultsToday: 0 });
   const [sheetPdfUrls, setSheetPdfUrls] = useState({});
+  const [expandedMewpId, setExpandedMewpId] = useState(null);
   const siteUrl = `${BASE_URL}/site/${siteId}`;
 
   useEffect(() => { if (siteId) loadData(); }, [siteId]);
+
+  function handleToggle(mewpId) {
+    setExpandedMewpId(prev => prev === mewpId ? null : mewpId);
+  }
 
   async function loadData() {
     setLoading(true);
@@ -218,7 +220,7 @@ export default function SiteDashboard({ siteId }) {
       const { data: mewpData } = await supabase.from("mewps").select("*").eq("site_id", siteId).eq("active", true).order("created_at", { ascending: true });
       setMewps(mewpData || []);
       const today = new Date().toISOString().split("T")[0];
-      const { data: todayData } = await supabase.from("daily_inspection_entries").select("id, mewp_id, operator_name, submitted_at, daily_status").eq("site_id", siteId).eq("inspection_date", today);
+      const { data: todayData } = await supabase.from("daily_inspection_entries").select("id, mewp_id, operator_name, pal_card_number, submitted_at, daily_status").eq("site_id", siteId).eq("inspection_date", today);
       const inspMap = {};
       (todayData || []).forEach(i => { inspMap[i.mewp_id] = i; });
       setTodayInspections(inspMap);
@@ -239,11 +241,24 @@ export default function SiteDashboard({ siteId }) {
 
   return (
     <div style={S.app}>
-      <div style={S.topbar}>
-        <img src="/logo.png" style={{ width: 36, height: 36, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
-        <div><div style={S.topbarTitle}>🏗️ {site.name}</div><div style={S.topbarSub}>Site Manager Dashboard{site.location ? ` · ${site.location}` : ""}</div></div>
+      {/* Part A — logo bar */}
+      <div style={S.logoBar}>
+        <img src="/logo.png" style={{ width: 90, height: 90, objectFit: "contain" }} />
+      </div>
+      {/* Part B — info bar */}
+      <div style={S.infoBar}>
+        <div>
+          <div style={{ fontSize: "1rem", fontWeight: 800, color: "#fff" }}>{site.name}</div>
+          {(site.location || site.postcode) && (
+            <div style={{ fontSize: "0.8rem", color: "#93c5fd" }}>
+              {[site.location, site.postcode].filter(Boolean).join(", ")}
+            </div>
+          )}
+          <div style={{ fontSize: "0.72rem", color: "#bfdbfe" }}>Site Manager Dashboard</div>
+        </div>
         <button style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: "8px", color: "#fff", padding: "0.5rem 0.75rem", cursor: "pointer", fontSize: "0.8rem", fontWeight: 700 }} onClick={loadData}>↻</button>
       </div>
+
       <div style={S.container}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.75rem", margin: "1rem 0" }}>
           {[["Total", stats.total, "#1d4ed8"], ["Done", stats.doneToday, "#15803d"], ["Faults", stats.faultsToday, stats.faultsToday > 0 ? "#b91c1c" : "#9ca3af"]].map(([label, value, color]) => (
@@ -292,7 +307,16 @@ export default function SiteDashboard({ siteId }) {
               <div style={{ fontSize: "1rem", color: "#6b7280", marginBottom: "1.5rem", fontWeight: 600 }}>No MEWPs added yet</div>
               <button style={{ ...S.primaryBtn(), maxWidth: "220px", margin: "0 auto" }} onClick={() => setShowAddModal(true)}>+ Add First MEWP</button>
             </div>
-          ) : mewps.map(mewp => <MEWPCard key={mewp.id} mewp={mewp} todayInspection={todayInspections[mewp.id] || null} initialPdfUrl={sheetPdfUrls[mewp.id] || null} />)}
+          ) : mewps.map(mewp => (
+            <MEWPCard
+              key={mewp.id}
+              mewp={mewp}
+              todayInspection={todayInspections[mewp.id] || null}
+              initialPdfUrl={sheetPdfUrls[mewp.id] || null}
+              isExpanded={expandedMewpId === mewp.id}
+              onToggle={() => handleToggle(mewp.id)}
+            />
+          ))}
         </div>
         <div style={{ background: "#fff", borderRadius: "12px", padding: "1.25rem", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
           <div style={{ fontSize: "0.8rem", fontWeight: 800, color: "#1d4ed8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "1rem" }}>Setup Instructions</div>
