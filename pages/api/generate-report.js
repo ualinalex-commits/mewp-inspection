@@ -77,6 +77,10 @@ export default async function handler(req, res) {
     return res.status(200).json({ success: true, pdf_url: pdfUrl });
   } catch (err) {
     console.error('[generate-report]', err);
-    return res.status(500).json({ error: err.message || 'PDF generation failed' });
+    const body = { error: err.message || 'PDF generation failed' };
+    if (err.docxtemplaterErrors) {
+      body.docxtemplaterErrors = err.docxtemplaterErrors;
+    }
+    return res.status(500).json(body);
   }
 }
