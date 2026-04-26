@@ -86,19 +86,14 @@ function fmtTs(ts) {
   return new Date(ts).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-function WeeklyTracker({ mewpId, todayInspectionId }) {
+function WeeklyTracker({ mewpId, refreshKey }) {
   const [doneSet, setDoneSet] = useState(null);
   const weekDates = getWeekDates();
   const todayStr = new Date().toISOString().split("T")[0];
 
   useEffect(() => {
     load();
-  }, [mewpId]);
-
-  // Re-fetch when today's inspection changes (e.g. via real-time update)
-  useEffect(() => {
-    if (doneSet !== null) load();
-  }, [todayInspectionId]);
+  }, [mewpId, refreshKey]);
 
   async function load() {
     const { data } = await supabase
@@ -152,7 +147,7 @@ function WeeklyTracker({ mewpId, todayInspectionId }) {
   );
 }
 
-function MEWPCard({ mewp, todayInspection, initialPdfUrl, initialPdfGeneratedAt, isExpanded, onToggle }) {
+function MEWPCard({ mewp, todayInspection, initialPdfUrl, initialPdfGeneratedAt, isExpanded, onToggle, refreshKey }) {
   const [showNFC, setShowNFC] = useState(false);
   const [faults, setFaults] = useState(null);
   const [loadingFaults, setLoadingFaults] = useState(false);
@@ -232,7 +227,7 @@ function MEWPCard({ mewp, todayInspection, initialPdfUrl, initialPdfGeneratedAt,
         <div style={{ padding: "0 1rem 1rem 1rem", display: "flex", flexDirection: "column", gap: "0.75rem", borderTop: "1px solid #f0f0f0" }}>
 
           {/* Weekly tracker — directly under MEWP name */}
-          <WeeklyTracker mewpId={mewp.id} todayInspectionId={todayInspection?.id || null} />
+          <WeeklyTracker mewpId={mewp.id} refreshKey={refreshKey} />
 
           {/* Inspection status detail */}
           {todayInspection ? (
@@ -314,6 +309,7 @@ export default function SiteDashboard({ siteId }) {
   const [sheetPdfUrls, setSheetPdfUrls] = useState({});
   const [sheetPdfTimestamps, setSheetPdfTimestamps] = useState({});
   const [expandedMewpId, setExpandedMewpId] = useState(null);
+  const [rtRefreshKey, setRtRefreshKey] = useState(0);
   const siteUrl = `${BASE_URL}/site/${siteId}`;
 
   useEffect(() => { if (siteId) loadData(); }, [siteId]);
@@ -321,14 +317,21 @@ export default function SiteDashboard({ siteId }) {
   // Real-time subscription on daily_inspection_entries for this site
   useEffect(() => {
     if (!siteId) return;
+    console.log("[Real-time] Setting up subscription for site:", siteId);
     const channel = supabase
       .channel(`site-${siteId}-inspections`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "daily_inspection_entries", filter: `site_id=eq.${siteId}` },
-        () => refreshTodayData(siteId)
+        (payload) => {
+          console.log("[Real-time] Inspection event received:", payload);
+          refreshTodayData(siteId);
+          setRtRefreshKey(k => k + 1);
+        }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("[Real-time] Subscription status:", status);
+      });
     return () => { supabase.removeChannel(channel); };
   }, [siteId]);
 
@@ -471,6 +474,7 @@ export default function SiteDashboard({ siteId }) {
                 initialPdfGeneratedAt={sheetPdfTimestamps[mewp.id] || null}
                 isExpanded={expanded}
                 onToggle={() => handleToggle(mewp.id)}
+                refreshKey={rtRefreshKey}
               />
             </div>
           );
