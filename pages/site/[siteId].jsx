@@ -421,9 +421,11 @@ export default function SiteDashboard({ siteId }) {
   const [archivedMewps, setArchivedMewps] = useState([]);
   const [loadingArchived, setLoadingArchived] = useState(false);
   const showArchivedRef = useRef(false);
+  const mewpsRef = useRef([]);
   const siteUrl = `${BASE_URL}/site/${siteId}`;
 
   useEffect(() => { showArchivedRef.current = showArchived; }, [showArchived]);
+  useEffect(() => { mewpsRef.current = mewps; }, [mewps]);
 
   useEffect(() => { if (siteId) loadData(); }, [siteId]);
 
@@ -496,43 +498,46 @@ export default function SiteDashboard({ siteId }) {
   }
 
   async function refreshMewps() {
-    const { data: mewpData } = await supabase
+    const { data: mewpData, error } = await supabase
       .from("mewps")
       .select("*")
       .eq("site_id", siteId)
       .eq("active", true)
       .or("is_archived.eq.false,is_archived.is.null")
       .order("created_at", { ascending: true });
-    setMewps(mewpData || []);
-    setStats(prev => ({ ...prev, total: (mewpData || []).length }));
+    if (error || !mewpData) return;
+    setMewps(mewpData);
+    setStats(prev => ({ ...prev, total: mewpData.length }));
   }
 
   async function refreshPdfData() {
-    const { data: sheetData } = await supabase
+    const { data: sheetData, error } = await supabase
       .from("weekly_inspection_sheets")
       .select("mewp_id, pdf_url, pdf_generated_at")
       .eq("site_id", siteId)
       .not("pdf_url", "is", null)
       .order("week_commencing", { ascending: false });
+    if (error || !sheetData) return;
     const pdfMap = {};
     const tsMap = {};
-    (sheetData || []).forEach(s => { if (!pdfMap[s.mewp_id]) { pdfMap[s.mewp_id] = s.pdf_url; tsMap[s.mewp_id] = s.pdf_generated_at; } });
+    sheetData.forEach(s => { if (!pdfMap[s.mewp_id]) { pdfMap[s.mewp_id] = s.pdf_url; tsMap[s.mewp_id] = s.pdf_generated_at; } });
     setSheetPdfUrls(pdfMap);
     setSheetPdfTimestamps(tsMap);
   }
 
   async function refreshTodayData(id) {
     const today = toLocalDateStr(new Date());
-    const { data: todayData } = await supabase
+    const { data: todayData, error } = await supabase
       .from("daily_inspection_entries")
       .select("id, mewp_id, operator_name, pal_card_number, submitted_at, daily_status")
       .eq("site_id", id || siteId)
       .eq("inspection_date", today);
+    if (error || !todayData) return;
     const inspMap = {};
-    (todayData || []).forEach(i => { inspMap[i.mewp_id] = i; });
+    todayData.forEach(i => { inspMap[i.mewp_id] = i; });
     setTodayInspections(inspMap);
-    const activeMewpIds = new Set(mewps.map(m => m.id));
-    const activeToday = (todayData || []).filter(i => activeMewpIds.has(i.mewp_id));
+    const activeMewpIds = new Set(mewpsRef.current.map(m => m.id));
+    const activeToday = todayData.filter(i => activeMewpIds.has(i.mewp_id));
     setStats(prev => ({
       ...prev,
       doneToday: activeToday.length,
