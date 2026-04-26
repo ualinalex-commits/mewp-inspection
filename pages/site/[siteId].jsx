@@ -484,15 +484,28 @@ export default function SiteDashboard({ siteId }) {
   useEffect(() => {
     if (!siteId) return;
     const interval = setInterval(() => {
+      refreshMewps();
       refreshTodayData(siteId);
       refreshPdfData();
       setRtRefreshKey(k => k + 1);
-    }, 60000);
+    }, 10000);
     return () => clearInterval(interval);
   }, [siteId]);
 
   function handleToggle(mewpId) {
     setExpandedMewpId(prev => prev === mewpId ? null : mewpId);
+  }
+
+  async function refreshMewps() {
+    const { data: mewpData } = await supabase
+      .from("mewps")
+      .select("*")
+      .eq("site_id", siteId)
+      .eq("active", true)
+      .or("is_archived.eq.false,is_archived.is.null")
+      .order("created_at", { ascending: true });
+    setMewps(mewpData || []);
+    setStats(prev => ({ ...prev, total: (mewpData || []).length }));
   }
 
   async function refreshPdfData() {
