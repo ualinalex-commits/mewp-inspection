@@ -4,6 +4,22 @@ import QRCode from "qrcode";
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://yourapp.com";
 
+const WEEK_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+function getWeekDates() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dow = today.getDay(); // 0=Sun
+  const fromMon = (dow + 6) % 7; // steps back to Monday
+  const mon = new Date(today);
+  mon.setDate(today.getDate() - fromMon);
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(mon);
+    d.setDate(mon.getDate() + i);
+    return d.toISOString().split("T")[0];
+  });
+}
+
 const S = {
   app: { minHeight: "100vh", background: "#f3f4f6", fontFamily: "system-ui, -apple-system, sans-serif", color: "#111827", paddingBottom: "4rem" },
   logoBar: { background: "#fff", padding: "0.5rem", display: "flex", alignItems: "center", justifyContent: "center" },
@@ -50,7 +66,7 @@ function AddMEWPModal({ siteId, onClose, onAdded }) {
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 200, padding: "1rem" }}>
       <div style={{ background: "#fff", borderRadius: "16px", width: "100%", maxWidth: "500px", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", boxShadow: "0 -4px 24px rgba(0,0,0,0.15)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#111827" }}>➕ Add MEWP</div>
+          <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#111827" }}>+ Add MEWP</div>
           <button onClick={onClose} style={{ background: "#f3f4f6", border: "none", borderRadius: "50%", width: "2rem", height: "2rem", cursor: "pointer", fontSize: "1rem", color: "#374151" }}>×</button>
         </div>
         {[{ key: "name", label: "MEWP Name / ID *", placeholder: "e.g. MEWP-01, Scissor Lift A" }, { key: "model", label: "Model", placeholder: "e.g. Genie GS-2632" }, { key: "serialNumber", label: "Serial Number", placeholder: "e.g. SN-001234" }].map(f => (
@@ -58,7 +74,7 @@ function AddMEWPModal({ siteId, onClose, onAdded }) {
         ))}
         <div style={{ display: "flex", gap: "0.75rem" }}>
           <button style={{ ...S.ghostBtn(), flex: 1, padding: "0.85rem" }} onClick={onClose}>Cancel</button>
-          <button style={{ ...S.primaryBtn(), flex: 2, opacity: form.name.trim() && !loading ? 1 : 0.4 }} onClick={handleAdd} disabled={!form.name.trim() || loading}>{loading ? "Adding..." : "Add MEWP →"}</button>
+          <button style={{ ...S.primaryBtn(), flex: 2, opacity: form.name.trim() && !loading ? 1 : 0.4 }} onClick={handleAdd} disabled={!form.name.trim() || loading}>{loading ? "Adding..." : "Add MEWP"}</button>
         </div>
       </div>
     </div>
@@ -68,6 +84,72 @@ function AddMEWPModal({ siteId, onClose, onAdded }) {
 function fmtTs(ts) {
   if (!ts) return null;
   return new Date(ts).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function WeeklyTracker({ mewpId, todayInspectionId }) {
+  const [doneSet, setDoneSet] = useState(null);
+  const weekDates = getWeekDates();
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  useEffect(() => {
+    load();
+  }, [mewpId]);
+
+  // Re-fetch when today's inspection changes (e.g. via real-time update)
+  useEffect(() => {
+    if (doneSet !== null) load();
+  }, [todayInspectionId]);
+
+  async function load() {
+    const { data } = await supabase
+      .from("daily_inspection_entries")
+      .select("inspection_date")
+      .eq("mewp_id", mewpId)
+      .in("inspection_date", weekDates);
+    const set = new Set((data || []).map(d => d.inspection_date));
+    setDoneSet(set);
+  }
+
+  return (
+    <div style={{ padding: "0.75rem 0 0.25rem 0" }}>
+      <div style={{ fontSize: "0.65rem", fontWeight: 800, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.5rem" }}>This week</div>
+      <div style={{ display: "flex", gap: "0.35rem" }}>
+        {weekDates.map((date, i) => {
+          const isFuture = date > todayStr;
+          const done = doneSet ? doneSet.has(date) : null;
+          const isToday = date === todayStr;
+
+          let bg, border;
+          if (doneSet === null) {
+            bg = "#e5e7eb"; border = "2px solid transparent";
+          } else if (done) {
+            bg = "#15803d"; border = isToday ? "2px solid #14532d" : "2px solid transparent";
+          } else if (isFuture) {
+            bg = "#e5e7eb"; border = "2px solid transparent";
+          } else {
+            bg = "#dc2626"; border = isToday ? "2px solid #7f1d1d" : "2px solid transparent";
+          }
+
+          return (
+            <div key={date} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.2rem", flex: 1 }}>
+              <div style={{
+                width: "100%",
+                aspectRatio: "1",
+                maxWidth: "40px",
+                borderRadius: "6px",
+                background: bg,
+                border,
+                boxSizing: "border-box",
+              }} />
+              <div style={{ fontSize: "0.58rem", color: isToday ? "#1d4ed8" : "#9ca3af", fontWeight: isToday ? 900 : 700, textTransform: "uppercase" }}>
+                {WEEK_DAYS[i]}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function MEWPCard({ mewp, todayInspection, initialPdfUrl, initialPdfGeneratedAt, isExpanded, onToggle }) {
@@ -130,7 +212,7 @@ function MEWPCard({ mewp, todayInspection, initialPdfUrl, initialPdfGeneratedAt,
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.2rem", flexShrink: 0 }}>
           <span style={S.statPill(statusColor)}>
-            {todayInspection ? (hasFault ? "⚠️ Faults" : `✅ Done${inspTime ? ` ${inspTime}` : ""}`) : "⏳ Pending"}
+            {todayInspection ? (hasFault ? "Faults" : `Done${inspTime ? ` ${inspTime}` : ""}`) : "Pending"}
           </span>
           {todayInspection?.operator_name && (
             <span style={{ fontSize: "0.72rem", color: "#6b7280" }}>{todayInspection.operator_name}</span>
@@ -144,15 +226,19 @@ function MEWPCard({ mewp, todayInspection, initialPdfUrl, initialPdfGeneratedAt,
       {/* Expandable body */}
       <div style={{
         overflow: "hidden",
-        maxHeight: isExpanded ? "1400px" : "0",
+        maxHeight: isExpanded ? "1600px" : "0",
         transition: "max-height 0.35s ease",
       }}>
         <div style={{ padding: "0 1rem 1rem 1rem", display: "flex", flexDirection: "column", gap: "0.75rem", borderTop: "1px solid #f0f0f0" }}>
+
+          {/* Weekly tracker — directly under MEWP name */}
+          <WeeklyTracker mewpId={mewp.id} todayInspectionId={todayInspection?.id || null} />
+
           {/* Inspection status detail */}
           {todayInspection ? (
-            <div style={{ background: hasFault ? "#fef2f2" : "#f0fdf4", border: `1px solid ${hasFault ? "#fecaca" : "#bbf7d0"}`, borderRadius: "8px", padding: "0.65rem 0.85rem", marginTop: "0.75rem" }}>
+            <div style={{ background: hasFault ? "#fef2f2" : "#f0fdf4", border: `1px solid ${hasFault ? "#fecaca" : "#bbf7d0"}`, borderRadius: "8px", padding: "0.65rem 0.85rem" }}>
               <div style={{ fontSize: "0.85rem", color: hasFault ? "#b91c1c" : "#15803d", fontWeight: 600 }}>
-                {hasFault ? "⚠️ Faults found" : "✅ All clear"} — {todayInspection.operator_name}
+                {hasFault ? "Faults found" : "All clear"} — {todayInspection.operator_name}
                 {inspTime && <span style={{ color: "#9ca3af", fontWeight: 400, marginLeft: "0.5rem" }}>{inspTime}</span>}
               </div>
               {todayInspection.pal_card_number && (
@@ -160,8 +246,8 @@ function MEWPCard({ mewp, todayInspection, initialPdfUrl, initialPdfGeneratedAt,
               )}
             </div>
           ) : (
-            <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "0.65rem 0.85rem", fontSize: "0.85rem", color: "#6b7280", fontWeight: 600, marginTop: "0.75rem" }}>
-              ⏳ Not yet inspected today
+            <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "0.65rem 0.85rem", fontSize: "0.85rem", color: "#6b7280", fontWeight: 600 }}>
+              Not yet inspected today
             </div>
           )}
 
@@ -170,7 +256,7 @@ function MEWPCard({ mewp, todayInspection, initialPdfUrl, initialPdfGeneratedAt,
           )}
           {hasFault && faults !== null && faults.length > 0 && (
             <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "8px", padding: "0.85rem" }}>
-              <div style={{ fontSize: "0.8rem", fontWeight: 800, color: "#b91c1c", marginBottom: "0.65rem", textTransform: "uppercase", letterSpacing: "0.04em" }}>⚠️ Faults Logged Today</div>
+              <div style={{ fontSize: "0.8rem", fontWeight: 800, color: "#b91c1c", marginBottom: "0.65rem", textTransform: "uppercase", letterSpacing: "0.04em" }}>Faults Logged Today</div>
               {faults.map((fault, i) => (
                 <div key={fault.item_number} style={{ marginBottom: i < faults.length - 1 ? "0.65rem" : 0, paddingBottom: i < faults.length - 1 ? "0.65rem" : 0, borderBottom: i < faults.length - 1 ? "1px solid #fecaca" : "none" }}>
                   <div style={{ fontSize: "0.78rem", fontWeight: 800, color: "#b91c1c" }}>Item #{String(fault.item_number).padStart(2, "0")} — {fault.description}</div>
@@ -185,7 +271,7 @@ function MEWPCard({ mewp, todayInspection, initialPdfUrl, initialPdfGeneratedAt,
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
             {initialPdfUrl ? (
               <>
-                <a href={initialPdfUrl} target="_blank" rel="noreferrer" style={{ background: "#fff", color: "#15803d", border: "2px solid #15803d55", borderRadius: "10px", padding: "0.65rem 1rem", fontSize: "0.82rem", fontWeight: 700, cursor: "pointer", fontFamily: "system-ui, sans-serif", whiteSpace: "nowrap", textDecoration: "none" }}>📄 View PDF</a>
+                <a href={initialPdfUrl} target="_blank" rel="noreferrer" style={{ background: "#fff", color: "#15803d", border: "2px solid #15803d55", borderRadius: "10px", padding: "0.65rem 1rem", fontSize: "0.82rem", fontWeight: 700, cursor: "pointer", fontFamily: "system-ui, sans-serif", whiteSpace: "nowrap", textDecoration: "none" }}>View PDF</a>
                 {initialPdfGeneratedAt && (
                   <span style={{ fontSize: "0.72rem", color: "#9ca3af" }}>Last updated: {fmtTs(initialPdfGeneratedAt)}</span>
                 )}
@@ -197,9 +283,9 @@ function MEWPCard({ mewp, todayInspection, initialPdfUrl, initialPdfGeneratedAt,
 
           {/* Action buttons */}
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-            <button style={S.ghostBtn("#1d4ed8")} onClick={() => setShowNFC(!showNFC)}>{showNFC ? "Hide NFC" : "📱 NFC Tag"}</button>
-            <button style={S.ghostBtn()} onClick={copyNFC}>📋 Copy URL</button>
-            <a href={nfcUrl} target="_blank" rel="noreferrer" style={{ ...S.ghostBtn("#1d4ed8"), textDecoration: "none" }}>Open Form ↗</a>
+            <button style={S.ghostBtn("#1d4ed8")} onClick={() => setShowNFC(!showNFC)}>{showNFC ? "Hide NFC" : "NFC Tag"}</button>
+            <button style={S.ghostBtn()} onClick={copyNFC}>Copy URL</button>
+            <a href={nfcUrl} target="_blank" rel="noreferrer" style={{ ...S.ghostBtn("#1d4ed8"), textDecoration: "none" }}>Open Form</a>
           </div>
 
           {/* NFC QR panel */}
@@ -232,8 +318,39 @@ export default function SiteDashboard({ siteId }) {
 
   useEffect(() => { if (siteId) loadData(); }, [siteId]);
 
+  // Real-time subscription on daily_inspection_entries for this site
+  useEffect(() => {
+    if (!siteId) return;
+    const channel = supabase
+      .channel(`site-${siteId}-inspections`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "daily_inspection_entries", filter: `site_id=eq.${siteId}` },
+        () => refreshTodayData(siteId)
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [siteId]);
+
   function handleToggle(mewpId) {
     setExpandedMewpId(prev => prev === mewpId ? null : mewpId);
+  }
+
+  async function refreshTodayData(id) {
+    const today = new Date().toISOString().split("T")[0];
+    const { data: todayData } = await supabase
+      .from("daily_inspection_entries")
+      .select("id, mewp_id, operator_name, pal_card_number, submitted_at, daily_status")
+      .eq("site_id", id || siteId)
+      .eq("inspection_date", today);
+    const inspMap = {};
+    (todayData || []).forEach(i => { inspMap[i.mewp_id] = i; });
+    setTodayInspections(inspMap);
+    setStats(prev => ({
+      ...prev,
+      doneToday: (todayData || []).length,
+      faultsToday: (todayData || []).filter(i => i.daily_status === "fault").length,
+    }));
   }
 
   async function loadData() {
@@ -304,7 +421,7 @@ export default function SiteDashboard({ siteId }) {
               <div style={{ height: "100%", width: `${(stats.doneToday / stats.total) * 100}%`, background: allDone ? "#15803d" : "#1d4ed8", transition: "width 0.4s", borderRadius: "5px" }} />
             </div>
             {pendingCount > 0 && <div style={{ fontSize: "0.8rem", color: "#6b7280", marginTop: "0.5rem" }}>{pendingCount} MEWP{pendingCount > 1 ? "s" : ""} still pending today</div>}
-            {allDone && <div style={{ fontSize: "0.8rem", color: "#15803d", marginTop: "0.5rem", fontWeight: 700 }}>✅ All MEWPs inspected today!</div>}
+            {allDone && <div style={{ fontSize: "0.8rem", color: "#15803d", marginTop: "0.5rem", fontWeight: 700 }}>All MEWPs inspected today!</div>}
           </div>
         )}
         <div style={S.card}>
