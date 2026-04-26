@@ -432,7 +432,10 @@ export default function SiteDashboard({ siteId }) {
     if (!siteId) return;
     const channel = supabase
       .channel(`site-${siteId}-mewps`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "mewps", filter: `site_id=eq.${siteId}` }, async () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "mewps" }, async (payload) => {
+        console.log('[Real-time] MEWP event received:', payload);
+        const record = payload.new || payload.old;
+        if (record && record.site_id !== siteId) return;
         const { data: mewpData } = await supabase
           .from("mewps")
           .select("*")
