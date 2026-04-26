@@ -74,17 +74,12 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: err.message || 'Failed to resolve sheet' });
   }
 
-  // Phase 2: respond immediately, generate PDF in background.
-  // On Vercel Fluid Compute the function stays alive until the event loop drains,
-  // so the await below completes even though the HTTP response is already sent.
-  res.status(202).json({ accepted: true });
-
+  // Generate PDF synchronously — Vercel cuts off background work after res.send()
   try {
     await generateReport(mewp_id, weekCommencing);
+    return res.status(200).json({ ok: true });
   } catch (err) {
-    console.error('[generate-report] background error:', err.message);
-    if (err.docxtemplaterErrors) {
-      console.error('[generate-report] docxtemplater errors:', err.docxtemplaterErrors);
-    }
+    console.error('[generate-report] error:', err.message);
+    return res.status(500).json({ error: 'PDF generation failed' });
   }
 }

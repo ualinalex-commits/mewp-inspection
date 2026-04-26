@@ -271,14 +271,12 @@ function MEWPCard({ mewp, todayInspection, initialPdfUrl, initialPdfGeneratedAt,
           {/* Report buttons */}
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
             {initialPdfUrl ? (
-              <>
-                <a href={initialPdfUrl} target="_blank" rel="noreferrer" style={{ background: "#fff", color: "#15803d", border: "2px solid #15803d55", borderRadius: "10px", padding: "0.65rem 1rem", fontSize: "0.82rem", fontWeight: 700, cursor: "pointer", fontFamily: "system-ui, sans-serif", whiteSpace: "nowrap", textDecoration: "none" }}>View PDF</a>
-                {initialPdfGeneratedAt && (
-                  <span style={{ fontSize: "0.72rem", color: "#9ca3af" }}>Last updated: {fmtTs(initialPdfGeneratedAt)}</span>
-                )}
-              </>
+              <a href={initialPdfUrl} target="_blank" rel="noreferrer" style={{ background: "#fff", color: "#15803d", border: "2px solid #15803d55", borderRadius: "10px", padding: "0.65rem 1rem", fontSize: "0.82rem", fontWeight: 700, cursor: "pointer", fontFamily: "system-ui, sans-serif", whiteSpace: "nowrap", textDecoration: "none" }}>View PDF</a>
             ) : (
-              <span style={{ fontSize: "0.78rem", color: "#9ca3af" }}>PDF generates automatically after each inspection</span>
+              <span style={{ background: "#f9fafb", color: "#9ca3af", border: "2px solid #e5e7eb", borderRadius: "10px", padding: "0.65rem 1rem", fontSize: "0.82rem", fontWeight: 700, fontFamily: "system-ui, sans-serif", whiteSpace: "nowrap" }}>Generating...</span>
+            )}
+            {initialPdfGeneratedAt && (
+              <span style={{ fontSize: "0.72rem", color: "#9ca3af" }}>Last updated: {fmtTs(initialPdfGeneratedAt)}</span>
             )}
           </div>
 
