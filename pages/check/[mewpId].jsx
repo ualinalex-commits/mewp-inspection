@@ -215,6 +215,19 @@ export default function CheckPage({ mewpId }) {
       SECTIONS.forEach(section => { section.items.forEach(item => { if (visual[item.id] === "fail") defectRows.push({ entry_id: entryId, sheet_id: sheetId, mewp_id: mewpId, site_id: mewp.sites.id, inspection_date: today, item_number: item.id, check_type: "visual", defect_details: defects[item.id] || "Fault identified during pre-use inspection", date_noted: today, status: "open" }); }); });
       FUNCTION_CHECKS.forEach(item => { const v = fnChecks[item.id]; if (v?.ground === "fail" || v?.platform === "fail") { const which = v?.ground === "fail" && v?.platform === "fail" ? "Ground and Platform" : v?.ground === "fail" ? "Ground" : "Platform"; defectRows.push({ entry_id: entryId, sheet_id: sheetId, mewp_id: mewpId, site_id: mewp.sites.id, inspection_date: today, item_number: item.id, check_type: "function", defect_details: defects[item.id] || `Fault on ${which} control`, date_noted: today, status: "open" }); }});
       if (defectRows.length > 0) { const { error: defectErr } = await supabase.from("defect_log").insert(defectRows); if (defectErr) throw new Error(`Defects: ${defectErr.message}`); }
+
+      // Trigger PDF generation in the background — fire and don't block the done screen
+      console.log("[inspection] submission saved, triggering PDF for mewp_id:", mewpId, "sheet_id:", sheetId);
+      fetch("/api/trigger-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mewp_id: mewpId, sheet_id: sheetId }),
+      }).then(r => r.json()).then(data => {
+        console.log("[inspection] PDF generation response:", data);
+      }).catch(err => {
+        console.error("[inspection] PDF generation error:", err);
+      });
+
       setPageStatus("done");
     } catch (err) {
       if (entryId) {
