@@ -421,9 +421,40 @@ export default function SiteDashboard({ siteId }) {
   const [showArchived, setShowArchived] = useState(false);
   const [archivedMewps, setArchivedMewps] = useState([]);
   const [loadingArchived, setLoadingArchived] = useState(false);
+  const showArchivedRef = useRef(false);
   const siteUrl = `${BASE_URL}/site/${siteId}`;
 
+  useEffect(() => { showArchivedRef.current = showArchived; }, [showArchived]);
+
   useEffect(() => { if (siteId) loadData(); }, [siteId]);
+
+  useEffect(() => {
+    if (!siteId) return;
+    const channel = supabase
+      .channel(`site-${siteId}-mewps`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "mewps", filter: `site_id=eq.${siteId}` }, async () => {
+        const { data: mewpData } = await supabase
+          .from("mewps")
+          .select("*")
+          .eq("site_id", siteId)
+          .eq("active", true)
+          .or("is_archived.eq.false,is_archived.is.null")
+          .order("created_at", { ascending: true });
+        setMewps(mewpData || []);
+        setStats(prev => ({ ...prev, total: (mewpData || []).length }));
+        if (showArchivedRef.current) {
+          const { data: archivedData } = await supabase
+            .from("mewps")
+            .select("*")
+            .eq("site_id", siteId)
+            .eq("is_archived", true)
+            .order("created_at", { ascending: true });
+          setArchivedMewps(archivedData || []);
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [siteId]);
 
   useEffect(() => {
     if (!siteId) return;
