@@ -429,7 +429,11 @@ export default function SiteDashboard({ siteId }) {
   useEffect(() => { if (siteId) loadData(); }, [siteId]);
 
   useEffect(() => {
-    if (!siteId) return;
+    if (!siteId) {
+      console.log('[Real-time] Skipping MEWP subscription — siteId is', siteId);
+      return;
+    }
+    console.log('[Real-time] Setting up MEWP subscription for siteId:', siteId);
     const channel = supabase
       .channel(`site-${siteId}-mewps`)
       .on("postgres_changes", { event: "*", schema: "public", table: "mewps" }, async (payload) => {
@@ -455,7 +459,9 @@ export default function SiteDashboard({ siteId }) {
           setArchivedMewps(archivedData || []);
         }
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[Real-time] MEWP subscription status:', status);
+      });
     return () => { supabase.removeChannel(channel); };
   }, [siteId]);
 
