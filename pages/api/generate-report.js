@@ -28,12 +28,12 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'mewp_id is required' });
   }
 
+  // Phase 1: fast validation — resolve weekCommencing before responding
+  let weekCommencing;
   try {
     const supabase = adminClient();
-    let weekCommencing;
 
     if (sheet_id) {
-      // If the caller already knows which sheet, look up its week_commencing directly
       const { data: sheet, error } = await supabase
         .from('weekly_inspection_sheets')
         .select('week_commencing')
@@ -45,10 +45,8 @@ export default async function handler(req, res) {
       }
       weekCommencing = sheet.week_commencing;
     } else {
-      // Default to the current week
       weekCommencing = weekCommencingFor(new Date().toISOString().split('T')[0]);
 
-      // Verify a sheet exists for this MEWP this week; fall back to the most recent one
       const { data: sheet } = await supabase
         .from('weekly_inspection_sheets')
         .select('week_commencing')
@@ -57,7 +55,6 @@ export default async function handler(req, res) {
         .maybeSingle();
 
       if (!sheet) {
-        // No sheet this week — use the most recent one instead
         const { data: latest } = await supabase
           .from('weekly_inspection_sheets')
           .select('week_commencing')
@@ -72,15 +69,22 @@ export default async function handler(req, res) {
         weekCommencing = latest.week_commencing;
       }
     }
-
-    const pdfUrl = await generateReport(mewp_id, weekCommencing);
-    return res.status(200).json({ success: true, pdf_url: pdfUrl });
   } catch (err) {
-    console.error('[generate-report]', err);
-    const body = { error: err.message || 'PDF generation failed' };
+    console.error('[generate-report] lookup error:', err);
+    return res.status(500).json({ error: err.message || 'Failed to resolve sheet' });
+  }
+
+  // Phase 2: respond immediately, generate PDF in background.
+  // On Vercel Fluid Compute the function stays alive until the event loop drains,
+  // so the await below completes even though the HTTP response is already sent.
+  res.status(202).json({ accepted: true });
+
+  try {
+    await generateReport(mewp_id, weekCommencing);
+  } catch (err) {
+    console.error('[generate-report] background error:', err.message);
     if (err.docxtemplaterErrors) {
-      body.docxtemplaterErrors = err.docxtemplaterErrors;
+      console.error('[generate-report] docxtemplater errors:', err.docxtemplaterErrors);
     }
-    return res.status(500).json(body);
   }
 }

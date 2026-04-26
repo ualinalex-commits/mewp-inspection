@@ -317,26 +317,57 @@ export default function SiteDashboard({ siteId }) {
   // Real-time subscription on daily_inspection_entries for this site
   useEffect(() => {
     if (!siteId) return;
-    console.log("[Real-time] Setting up subscription for site:", siteId);
     const channel = supabase
       .channel(`site-${siteId}-inspections`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "daily_inspection_entries", filter: `site_id=eq.${siteId}` },
-        (payload) => {
-          console.log("[Real-time] Inspection event received:", payload);
+        () => {
           refreshTodayData(siteId);
           setRtRefreshKey(k => k + 1);
         }
       )
-      .subscribe((status) => {
-        console.log("[Real-time] Subscription status:", status);
-      });
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [siteId]);
+
+  // Real-time subscription on weekly_inspection_sheets — fires when background
+  // PDF generation writes the pdf_url, so the "Last updated" timestamp updates
+  // without requiring a manual page refresh.
+  useEffect(() => {
+    if (!siteId) return;
+    const channel = supabase
+      .channel(`site-${siteId}-sheets`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "weekly_inspection_sheets", filter: `site_id=eq.${siteId}` },
+        () => refreshPdfData()
+      )
+      .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [siteId]);
 
   function handleToggle(mewpId) {
     setExpandedMewpId(prev => prev === mewpId ? null : mewpId);
+  }
+
+  async function refreshPdfData() {
+    const { data: sheetData } = await supabase
+      .from("weekly_inspection_sheets")
+      .select("mewp_id, pdf_url, pdf_generated_at")
+      .eq("site_id", siteId)
+      .not("pdf_url", "is", null)
+      .order("week_commencing", { ascending: false });
+    const pdfMap = {};
+    const tsMap = {};
+    (sheetData || []).forEach(s => {
+      if (!pdfMap[s.mewp_id]) {
+        pdfMap[s.mewp_id] = s.pdf_url;
+        tsMap[s.mewp_id] = s.pdf_generated_at;
+      }
+    });
+    setSheetPdfUrls(pdfMap);
+    setSheetPdfTimestamps(tsMap);
   }
 
   async function refreshTodayData(id) {
