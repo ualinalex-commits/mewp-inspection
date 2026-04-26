@@ -38,7 +38,7 @@ function fmtWeekDate(dateStr) {
 
 const S = {
   app: { minHeight: "100vh", background: "#f3f4f6", fontFamily: "system-ui, -apple-system, sans-serif", color: "#111827", paddingBottom: "4rem" },
-  logoBar: { background: "#fff", padding: "0.5rem", display: "flex", alignItems: "center", justifyContent: "center" },
+  logoBar: { background: "#fff", padding: "0.25rem 1rem", display: "flex", alignItems: "center", justifyContent: "center" },
   infoBar: { background: "#1d4ed8", padding: "0.75rem 1.25rem", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" },
   container: { maxWidth: "640px", margin: "0 auto", padding: "1rem" },
   card: { background: "#fff", borderRadius: "12px", overflow: "hidden", marginBottom: "1rem", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" },
@@ -243,9 +243,9 @@ function MEWPCard({ mewp, todayInspection, initialPdfUrl, initialPdfGeneratedAt,
       {/* Collapsed header */}
       <div style={{ minHeight: "64px", padding: "0 1rem", display: "flex", alignItems: "center", gap: "0.75rem", background: isExpanded ? "#f8faff" : "#fff", transition: "background 0.2s" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: "1.05rem", fontWeight: 900, color: "#111827" }}>{mewp.machine_ref}</div>
-          {(mewp.model || mewp.serial_number) && (
-            <div style={{ fontSize: "0.78rem", color: "#9ca3af", marginTop: "0.1rem" }}>{[mewp.model, mewp.serial_number].filter(Boolean).join(" · ")}</div>
+          <div style={{ fontSize: "1.05rem", fontWeight: 900, color: "#111827" }}>{mewp.machine_ref}{mewp.serial_number ? ` - ${mewp.serial_number}` : ""}</div>
+          {mewp.model && (
+            <div style={{ fontSize: "0.78rem", color: "#9ca3af", marginTop: "0.1rem" }}>{mewp.model}</div>
           )}
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.2rem", flexShrink: 0 }}>
@@ -309,20 +309,19 @@ function MEWPCard({ mewp, todayInspection, initialPdfUrl, initialPdfGeneratedAt,
           {/* All historical reports */}
           <ReportsPanel mewpId={mewp.id} />
 
-          {/* NFC action buttons */}
+          {/* QR Code action buttons */}
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-            <button style={S.ghostBtn("#1d4ed8")} onClick={() => setShowNFC(!showNFC)}>{showNFC ? "Hide NFC" : "NFC Tag"}</button>
+            <button style={S.ghostBtn("#1d4ed8")} onClick={() => setShowNFC(!showNFC)}>{showNFC ? "Hide QR Code" : "QR Code"}</button>
             <button style={S.ghostBtn()} onClick={copyNFC}>Copy URL</button>
             <a href={nfcUrl} target="_blank" rel="noreferrer" style={{ ...S.ghostBtn("#1d4ed8"), textDecoration: "none" }}>Open Form</a>
           </div>
 
-          {/* NFC QR panel */}
+          {/* QR Code panel */}
           {showNFC && (
             <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "10px", padding: "1.25rem", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.85rem" }}>
-              <div style={{ fontSize: "0.75rem", color: "#6b7280", textAlign: "center", fontWeight: 600 }}>Programme NFC tag with this URL · Print QR for manual scan</div>
+              <div style={{ fontSize: "0.75rem", color: "#6b7280", textAlign: "center", fontWeight: 600 }}>Print this QR code and attach it to the physical MEWP</div>
               <QRCanvas url={nfcUrl} size={160} />
               <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "0.6rem 0.85rem", fontSize: "0.65rem", color: "#6b7280", wordBreak: "break-all", textAlign: "center", width: "100%", boxSizing: "border-box" }}>{nfcUrl}</div>
-              <div style={{ fontSize: "0.75rem", color: "#9ca3af", textAlign: "center", lineHeight: 1.6 }}>Recommended: NTAG213 or NTAG215 · Use NFC Tools app</div>
             </div>
           )}
 
@@ -366,9 +365,9 @@ function ArchivedMEWPCard({ mewp, onRestore }) {
       {/* Header */}
       <div style={{ minHeight: "60px", padding: "0 1rem", display: "flex", alignItems: "center", gap: "0.75rem", background: expanded ? "#fafafa" : "#fff" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: "1rem", fontWeight: 900, color: "#6b7280" }}>{mewp.machine_ref}</div>
-          {(mewp.model || mewp.serial_number) && (
-            <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: "0.1rem" }}>{[mewp.model, mewp.serial_number].filter(Boolean).join(" · ")}</div>
+          <div style={{ fontSize: "1rem", fontWeight: 900, color: "#6b7280" }}>{mewp.machine_ref}{mewp.serial_number ? ` - ${mewp.serial_number}` : ""}</div>
+          {mewp.model && (
+            <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: "0.1rem" }}>{mewp.model}</div>
           )}
         </div>
         <span style={{ ...S.statPill("#6b7280"), fontSize: "0.68rem" }}>Archived</span>
@@ -532,10 +531,12 @@ export default function SiteDashboard({ siteId }) {
     const inspMap = {};
     (todayData || []).forEach(i => { inspMap[i.mewp_id] = i; });
     setTodayInspections(inspMap);
+    const activeMewpIds = new Set(mewps.map(m => m.id));
+    const activeToday = (todayData || []).filter(i => activeMewpIds.has(i.mewp_id));
     setStats(prev => ({
       ...prev,
-      doneToday: (todayData || []).length,
-      faultsToday: (todayData || []).filter(i => i.daily_status === "fault").length,
+      doneToday: activeToday.length,
+      faultsToday: activeToday.filter(i => i.daily_status === "fault").length,
     }));
   }
 
@@ -561,7 +562,9 @@ export default function SiteDashboard({ siteId }) {
       const inspMap = {};
       (todayData || []).forEach(i => { inspMap[i.mewp_id] = i; });
       setTodayInspections(inspMap);
-      setStats({ total: (mewpData || []).length, doneToday: (todayData || []).length, faultsToday: (todayData || []).filter(i => i.daily_status === "fault").length });
+      const activeMewpIds = new Set((mewpData || []).map(m => m.id));
+      const activeToday = (todayData || []).filter(i => activeMewpIds.has(i.mewp_id));
+      setStats({ total: (mewpData || []).length, doneToday: activeToday.length, faultsToday: activeToday.filter(i => i.daily_status === "fault").length });
       const { data: sheetData } = await supabase
         .from("weekly_inspection_sheets")
         .select("mewp_id, pdf_url, pdf_generated_at")
@@ -622,7 +625,7 @@ export default function SiteDashboard({ siteId }) {
   return (
     <div style={S.app}>
       <div style={S.logoBar}>
-        <img src="/logo.png" style={{ width: 90, height: 90, objectFit: "contain" }} />
+        <img src="/logo.png" style={{ height: 64, width: "auto", maxWidth: "300px", objectFit: "contain" }} />
       </div>
       <div style={S.infoBar}>
         <div>
@@ -744,7 +747,7 @@ export default function SiteDashboard({ siteId }) {
         {/* Setup instructions */}
         <div style={{ background: "#fff", borderRadius: "12px", padding: "1.25rem", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
           <div style={{ fontSize: "0.8rem", fontWeight: 800, color: "#1d4ed8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "1rem" }}>Setup Instructions</div>
-          {[["1️⃣", "Add each MEWP using the button above"], ["2️⃣", "Tap NFC Tag on each MEWP to get its unique QR code"], ["3️⃣", "Use NFC Tools app to write the URL to an NFC sticker"], ["4️⃣", "Attach the NFC sticker to the physical MEWP"], ["5️⃣", "Workers scan the tag each morning before operating"], ["6️⃣", "Weekly PDF auto-generates every Sunday at 6PM"]].map(([n, text]) => (
+          {[["1️⃣", "Add each MEWP using the \"+ Add\" button above"], ["2️⃣", "Open the MEWP detail and tap \"QR Code\" to generate a unique QR code"], ["3️⃣", "Print the QR code and attach it to the physical MEWP"], ["4️⃣", "Workers scan the QR code each morning before operating"], ["5️⃣", "Complete the daily pre-use inspection on their device"], ["6️⃣", "Weekly PDF auto-generates every Sunday at 8PM and is saved in View Reports"]].map(([n, text]) => (
             <div key={n} style={{ display: "flex", gap: "0.75rem", marginBottom: "0.65rem", alignItems: "flex-start" }}>
               <span style={{ fontSize: "1.1rem", minWidth: "1.5rem" }}>{n}</span>
               <span style={{ fontSize: "0.85rem", color: "#374151", lineHeight: 1.5 }}>{text}</span>
