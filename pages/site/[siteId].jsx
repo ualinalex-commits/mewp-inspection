@@ -429,15 +429,12 @@ export default function SiteDashboard({ siteId }) {
   useEffect(() => { if (siteId) loadData(); }, [siteId]);
 
   useEffect(() => {
-    if (!siteId) {
-      console.log('[Real-time] Skipping MEWP subscription — siteId is', siteId);
-      return;
-    }
-    console.log('[Real-time] Setting up MEWP subscription for siteId:', siteId);
+    if (!siteId) return;
+    // Only listen for UPDATE events — INSERT is handled via local state in onAdded,
+    // and real-time INSERT events don't fire when written via the service role key.
     const channel = supabase
       .channel(`site-${siteId}-mewps`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "mewps" }, async (payload) => {
-        console.log('[Real-time] MEWP event received:', payload);
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "mewps" }, async (payload) => {
         const record = payload.new || payload.old;
         if (record && record.site_id !== siteId) return;
         const { data: mewpData } = await supabase
@@ -459,9 +456,7 @@ export default function SiteDashboard({ siteId }) {
           setArchivedMewps(archivedData || []);
         }
       })
-      .subscribe((status) => {
-        console.log('[Real-time] MEWP subscription status:', status);
-      });
+      .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [siteId]);
 
