@@ -206,6 +206,11 @@ export default function CheckPage({ mewpId }) {
       SECTIONS.forEach(section => { section.items.forEach(item => { if (visual[item.id] === "fail") defectRows.push({ entry_id: entryId, sheet_id: sheetId, mewp_id: mewpId, site_id: mewp.sites.id, inspection_date: today, item_number: item.id, check_type: "visual", defect_details: defects[item.id] || "Fault identified during pre-use inspection", date_noted: today, status: "open" }); }); });
       FUNCTION_CHECKS.forEach(item => { const v = fnChecks[item.id]; if (v?.ground === "fail" || v?.platform === "fail") { const which = v?.ground === "fail" && v?.platform === "fail" ? "Ground and Platform" : v?.ground === "fail" ? "Ground" : "Platform"; defectRows.push({ entry_id: entryId, sheet_id: sheetId, mewp_id: mewpId, site_id: mewp.sites.id, inspection_date: today, item_number: item.id, check_type: "function", defect_details: defects[item.id] || `Fault on ${which} control`, date_noted: today, status: "open" }); }});
       if (defectRows.length > 0) { const { error: defectErr } = await supabase.from("defect_log").insert(defectRows); if (defectErr) throw new Error(`Defects: ${defectErr.message}`); }
+      fetch("/api/generate-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mewp_id: mewpId, sheet_id: sheetId }),
+      }).catch(() => {});
       setPageStatus("done");
     } catch (err) { setSubmitError(err.message); setPageStatus("submit_error"); }
   }

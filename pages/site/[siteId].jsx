@@ -65,10 +65,13 @@ function AddMEWPModal({ siteId, onClose, onAdded }) {
   );
 }
 
-function MEWPCard({ mewp, todayInspection, initialPdfUrl, isExpanded, onToggle }) {
+function fmtTs(ts) {
+  if (!ts) return null;
+  return new Date(ts).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function MEWPCard({ mewp, todayInspection, initialPdfUrl, initialPdfGeneratedAt, isExpanded, onToggle }) {
   const [showNFC, setShowNFC] = useState(false);
-  const [pdfUrl, setPdfUrl] = useState(initialPdfUrl || null);
-  const [generating, setGenerating] = useState(false);
   const [faults, setFaults] = useState(null);
   const [loadingFaults, setLoadingFaults] = useState(false);
   const nfcUrl = mewp.nfc_url || `${BASE_URL}/check/${mewp.id}`;
@@ -102,27 +105,6 @@ function MEWPCard({ mewp, todayInspection, initialPdfUrl, isExpanded, onToggle }
     : null;
 
   function copyNFC() { navigator.clipboard.writeText(nfcUrl); alert("NFC URL copied!"); }
-
-  async function handleGenerateReport() {
-    setGenerating(true);
-    try {
-      const res = await fetch("/api/generate-report", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mewp_id: mewp.id }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setPdfUrl(data.pdf_url);
-      } else {
-        alert("Report failed: " + (data.error || "Unknown error"));
-      }
-    } catch (e) {
-      alert("Error: " + e.message);
-    } finally {
-      setGenerating(false);
-    }
-  }
 
   return (
     <div>
@@ -201,15 +183,15 @@ function MEWPCard({ mewp, todayInspection, initialPdfUrl, isExpanded, onToggle }
 
           {/* Report buttons */}
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
-            <button
-              style={{ background: "#fff", color: "#7c3aed", border: "2px solid #7c3aed55", borderRadius: "10px", padding: "0.65rem 1rem", fontSize: "0.82rem", fontWeight: 700, cursor: "pointer", fontFamily: "system-ui, sans-serif", whiteSpace: "nowrap", opacity: generating ? 0.5 : 1 }}
-              onClick={handleGenerateReport}
-              disabled={generating}
-            >
-              {generating ? "Generating..." : pdfUrl ? "↻ Regenerate" : "📊 Generate Report"}
-            </button>
-            {pdfUrl && (
-              <a href={pdfUrl} target="_blank" rel="noreferrer" style={{ background: "#fff", color: "#15803d", border: "2px solid #15803d55", borderRadius: "10px", padding: "0.65rem 1rem", fontSize: "0.82rem", fontWeight: 700, cursor: "pointer", fontFamily: "system-ui, sans-serif", whiteSpace: "nowrap", textDecoration: "none" }}>📄 View PDF</a>
+            {initialPdfUrl ? (
+              <>
+                <a href={initialPdfUrl} target="_blank" rel="noreferrer" style={{ background: "#fff", color: "#15803d", border: "2px solid #15803d55", borderRadius: "10px", padding: "0.65rem 1rem", fontSize: "0.82rem", fontWeight: 700, cursor: "pointer", fontFamily: "system-ui, sans-serif", whiteSpace: "nowrap", textDecoration: "none" }}>📄 View PDF</a>
+                {initialPdfGeneratedAt && (
+                  <span style={{ fontSize: "0.72rem", color: "#9ca3af" }}>Last updated: {fmtTs(initialPdfGeneratedAt)}</span>
+                )}
+              </>
+            ) : (
+              <span style={{ fontSize: "0.78rem", color: "#9ca3af" }}>PDF generates automatically after each inspection</span>
             )}
           </div>
 
@@ -244,6 +226,7 @@ export default function SiteDashboard({ siteId }) {
   const [showSiteQR, setShowSiteQR] = useState(false);
   const [stats, setStats] = useState({ total: 0, doneToday: 0, faultsToday: 0 });
   const [sheetPdfUrls, setSheetPdfUrls] = useState({});
+  const [sheetPdfTimestamps, setSheetPdfTimestamps] = useState({});
   const [expandedMewpId, setExpandedMewpId] = useState(null);
   const siteUrl = `${BASE_URL}/site/${siteId}`;
 
@@ -266,10 +249,12 @@ export default function SiteDashboard({ siteId }) {
       (todayData || []).forEach(i => { inspMap[i.mewp_id] = i; });
       setTodayInspections(inspMap);
       setStats({ total: (mewpData || []).length, doneToday: (todayData || []).length, faultsToday: (todayData || []).filter(i => i.daily_status === "fault").length });
-      const { data: sheetData } = await supabase.from("weekly_inspection_sheets").select("mewp_id, pdf_url").eq("site_id", siteId).not("pdf_url", "is", null).order("week_commencing", { ascending: false });
+      const { data: sheetData } = await supabase.from("weekly_inspection_sheets").select("mewp_id, pdf_url, pdf_generated_at").eq("site_id", siteId).not("pdf_url", "is", null).order("week_commencing", { ascending: false });
       const pdfMap = {};
-      (sheetData || []).forEach(s => { if (!pdfMap[s.mewp_id]) pdfMap[s.mewp_id] = s.pdf_url; });
+      const tsMap = {};
+      (sheetData || []).forEach(s => { if (!pdfMap[s.mewp_id]) { pdfMap[s.mewp_id] = s.pdf_url; tsMap[s.mewp_id] = s.pdf_generated_at; } });
       setSheetPdfUrls(pdfMap);
+      setSheetPdfTimestamps(tsMap);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   }
@@ -366,6 +351,7 @@ export default function SiteDashboard({ siteId }) {
                 mewp={mewp}
                 todayInspection={todayInspections[mewp.id] || null}
                 initialPdfUrl={sheetPdfUrls[mewp.id] || null}
+                initialPdfGeneratedAt={sheetPdfTimestamps[mewp.id] || null}
                 isExpanded={expanded}
                 onToggle={() => handleToggle(mewp.id)}
               />
