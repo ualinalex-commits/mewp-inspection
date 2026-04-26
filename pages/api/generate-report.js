@@ -22,6 +22,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  if (!process.env.CRON_SECRET || req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
   const { mewp_id, sheet_id } = req.body || {};
 
   if (!mewp_id) {
@@ -79,7 +83,7 @@ export default async function handler(req, res) {
     await generateReport(mewp_id, weekCommencing);
     return res.status(200).json({ ok: true });
   } catch (err) {
-    console.error('[generate-report] error:', err.message);
-    return res.status(500).json({ error: 'PDF generation failed' });
+    console.error('[generate-report] error:', err.stack || err.message);
+    return res.status(500).json({ error: 'PDF generation failed', detail: err.message });
   }
 }

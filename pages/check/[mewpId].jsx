@@ -68,9 +68,17 @@ const FUNCTION_CHECKS = [
   { id: 43, text: "Secondary guarding (function, operation, reset)" },
 ];
 
+function toLocalDateStr(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 function getDayOfWeek(dateStr) {
+  const [y, m, d] = dateStr.split("-").map(Number);
   const days = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
-  return days[new Date(dateStr).getDay()];
+  return days[new Date(y, m - 1, d).getDay()];
 }
 
 function Toggle({ value, onChange }) {
@@ -158,7 +166,7 @@ export default function CheckPage({ mewpId }) {
         const { data: mewpData, error: mewpErr } = await supabase.from("mewps").select("*, sites(id, name, location)").eq("id", mewpId).single();
         if (mewpErr || !mewpData) { setPageStatus("not_found"); return; }
         setMewp(mewpData);
-        const today = new Date().toISOString().split("T")[0];
+        const today = toLocalDateStr(new Date());
         const { data: todayEntry } = await supabase.from("daily_inspection_entries").select("id, operator_name, pal_card_number, submitted_at, daily_status").eq("mewp_id", mewpId).eq("inspection_date", today).single();
         if (todayEntry) { setExistingEntry(todayEntry); setPageStatus("already_done"); }
         else setPageStatus("form");
@@ -187,15 +195,16 @@ export default function CheckPage({ mewpId }) {
 
   async function handleSubmit() {
     setPageStatus("submitting");
+    let entryId = null;
     try {
-      const today = new Date().toISOString().split("T")[0];
+      const today = toLocalDateStr(new Date());
       const dayOfWeek = getDayOfWeek(today);
       const { data: sheetId, error: sheetErr } = await supabase.rpc("get_or_create_weekly_sheet", { p_mewp_id: mewpId, p_site_id: mewp.sites.id, p_machine_ref: mewp.machine_ref, p_date: today });
       if (sheetErr) throw new Error(`Sheet: ${sheetErr.message}`);
       const hasFaults = Object.values(visual).some(v => v === "fail") || Object.values(fnChecks).some(v => v?.ground === "fail" || v?.platform === "fail");
-      const { data: entryData, error: entryErr } = await supabase.from("daily_inspection_entries").insert({ sheet_id: sheetId, mewp_id: mewpId, site_id: mewp.sites.id, inspection_date: today, day_of_week: dayOfWeek, operator_name: operator.name.trim(), pal_card_number: operator.palCard.trim() || null, initialled: true, daily_status: hasFaults ? "fault" : "ok" }).select("id").single();
+      const { data: entryData, error: entryErr } = await supabase.from("daily_inspection_entries").insert({ sheet_id: sheetId, mewp_id: mewpId, site_id: mewp.sites.id, inspection_date: today, day_of_week: dayOfWeek, operator_name: operator.name.trim(), pal_card_number: operator.palCard.trim() || null, initialled: true, daily_status: hasFaults ? "fault" : "ok", submitted_at: new Date().toISOString() }).select("id").single();
       if (entryErr) throw new Error(`Entry: ${entryErr.message}`);
-      const entryId = entryData.id;
+      entryId = entryData.id;
       const visualRows = SECTIONS.flatMap(section => section.items.map(item => ({ entry_id: entryId, sheet_id: sheetId, mewp_id: mewpId, inspection_date: today, item_number: item.id, category: section.id, result: visual[item.id] || null })));
       const { error: visualErr } = await supabase.from("visual_check_results").insert(visualRows);
       if (visualErr) throw new Error(`Visual: ${visualErr.message}`);
@@ -206,13 +215,14 @@ export default function CheckPage({ mewpId }) {
       SECTIONS.forEach(section => { section.items.forEach(item => { if (visual[item.id] === "fail") defectRows.push({ entry_id: entryId, sheet_id: sheetId, mewp_id: mewpId, site_id: mewp.sites.id, inspection_date: today, item_number: item.id, check_type: "visual", defect_details: defects[item.id] || "Fault identified during pre-use inspection", date_noted: today, status: "open" }); }); });
       FUNCTION_CHECKS.forEach(item => { const v = fnChecks[item.id]; if (v?.ground === "fail" || v?.platform === "fail") { const which = v?.ground === "fail" && v?.platform === "fail" ? "Ground and Platform" : v?.ground === "fail" ? "Ground" : "Platform"; defectRows.push({ entry_id: entryId, sheet_id: sheetId, mewp_id: mewpId, site_id: mewp.sites.id, inspection_date: today, item_number: item.id, check_type: "function", defect_details: defects[item.id] || `Fault on ${which} control`, date_noted: today, status: "open" }); }});
       if (defectRows.length > 0) { const { error: defectErr } = await supabase.from("defect_log").insert(defectRows); if (defectErr) throw new Error(`Defects: ${defectErr.message}`); }
-      fetch("/api/generate-report", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mewp_id: mewpId, sheet_id: sheetId }),
-      }).catch(() => {});
       setPageStatus("done");
-    } catch (err) { setSubmitError(err.message); setPageStatus("submit_error"); }
+    } catch (err) {
+      if (entryId) {
+        await supabase.from("daily_inspection_entries").delete().eq("id", entryId);
+      }
+      setSubmitError(err.message);
+      setPageStatus("submit_error");
+    }
   }
 
   const totalVisual = SECTIONS.reduce((a, s) => a + s.items.length, 0);

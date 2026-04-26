@@ -22,7 +22,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  if (req.query.secret !== process.env.CRON_SECRET) {
+  if (!process.env.CRON_SECRET || req.query.secret !== process.env.CRON_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
@@ -61,7 +61,7 @@ export default async function handler(req, res) {
       await generateReport(mewp.id, weekCommencing);
       results.push({ mewp_id: mewp.id, machine_ref: mewp.machine_ref, status: 'ok' });
     } catch (err) {
-      console.error(`[weekly-archive] mewp ${mewp.id} failed:`, err.message);
+      console.error(`[weekly-archive] mewp ${mewp.id} (${mewp.machine_ref}) failed:`, err.stack || err.message);
       results.push({ mewp_id: mewp.id, machine_ref: mewp.machine_ref, status: 'error', error: err.message });
     }
   }
