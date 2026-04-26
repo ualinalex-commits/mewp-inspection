@@ -6,17 +6,23 @@ const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://yourapp.com";
 
 const WEEK_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+function toLocalDateStr(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 function getWeekDates() {
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
   const dow = today.getDay(); // 0=Sun
-  const fromMon = (dow + 6) % 7; // steps back to Monday
+  const fromMon = (dow + 6) % 7; // Mon=0 … Sun=6
   const mon = new Date(today);
   mon.setDate(today.getDate() - fromMon);
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(mon);
     d.setDate(mon.getDate() + i);
-    return d.toISOString().split("T")[0];
+    return toLocalDateStr(d);
   });
 }
 
@@ -89,7 +95,7 @@ function fmtTs(ts) {
 function WeeklyTracker({ mewpId, refreshKey }) {
   const [doneSet, setDoneSet] = useState(null);
   const weekDates = getWeekDates();
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = toLocalDateStr(new Date());
 
   useEffect(() => {
     load();
@@ -347,6 +353,18 @@ export default function SiteDashboard({ siteId }) {
     return () => { supabase.removeChannel(channel); };
   }, [siteId]);
 
+  // Fallback polling — refreshes dashboard data every 60 s in case real-time
+  // subscriptions miss an event (e.g. tab backgrounded, network blip).
+  useEffect(() => {
+    if (!siteId) return;
+    const interval = setInterval(() => {
+      refreshTodayData(siteId);
+      refreshPdfData();
+      setRtRefreshKey(k => k + 1);
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [siteId]);
+
   function handleToggle(mewpId) {
     setExpandedMewpId(prev => prev === mewpId ? null : mewpId);
   }
@@ -371,7 +389,7 @@ export default function SiteDashboard({ siteId }) {
   }
 
   async function refreshTodayData(id) {
-    const today = new Date().toISOString().split("T")[0];
+    const today = toLocalDateStr(new Date());
     const { data: todayData } = await supabase
       .from("daily_inspection_entries")
       .select("id, mewp_id, operator_name, pal_card_number, submitted_at, daily_status")
@@ -394,7 +412,7 @@ export default function SiteDashboard({ siteId }) {
       setSite(siteData);
       const { data: mewpData } = await supabase.from("mewps").select("*").eq("site_id", siteId).eq("active", true).order("created_at", { ascending: true });
       setMewps(mewpData || []);
-      const today = new Date().toISOString().split("T")[0];
+      const today = toLocalDateStr(new Date());
       const { data: todayData } = await supabase.from("daily_inspection_entries").select("id, mewp_id, operator_name, pal_card_number, submitted_at, daily_status").eq("site_id", siteId).eq("inspection_date", today);
       const inspMap = {};
       (todayData || []).forEach(i => { inspMap[i.mewp_id] = i; });
