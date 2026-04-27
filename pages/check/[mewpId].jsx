@@ -105,29 +105,39 @@ function Toggle({ value, onChange }) {
   );
 }
 
-function GPToggle({ value, onChange }) {
+function GPToggle({ value, onChange, missingGround, missingPlatform }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", marginTop: "0.6rem" }}>
-      {["ground", "platform"].map(key => (
-        <div key={key}>
-          <div style={{ fontSize: "0.65rem", fontWeight: 800, color: "#6b7280", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.25rem" }}>{key === "ground" ? "G — Ground Control" : "P — Platform Control"}</div>
-          <div style={{ display: "flex", gap: "0.5rem" }}>
-            <button onClick={() => onChange(key, value?.[key] === "pass" ? null : "pass")} style={{ flex: 1, padding: "0.8rem 0", fontSize: "0.95rem", fontWeight: 800, border: "2px solid", borderRadius: "10px", cursor: "pointer", borderColor: value?.[key] === "pass" ? "#16a34a" : "#d1d5db", background: value?.[key] === "pass" ? "#16a34a" : "#f9fafb", color: value?.[key] === "pass" ? "#fff" : "#9ca3af", transition: "all 0.15s", fontFamily: "system-ui, sans-serif" }}>✓ PASS</button>
-            <button onClick={() => onChange(key, value?.[key] === "fail" ? null : "fail")} style={{ flex: 1, padding: "0.8rem 0", fontSize: "0.95rem", fontWeight: 800, border: "2px solid", borderRadius: "10px", cursor: "pointer", borderColor: value?.[key] === "fail" ? "#dc2626" : "#d1d5db", background: value?.[key] === "fail" ? "#dc2626" : "#f9fafb", color: value?.[key] === "fail" ? "#fff" : "#9ca3af", transition: "all 0.15s", fontFamily: "system-ui, sans-serif" }}>✗ FAIL</button>
-            <button onClick={() => onChange(key, value?.[key] === "na" ? null : "na")} style={{ flex: 1, padding: "0.8rem 0", fontSize: "0.95rem", fontWeight: 800, border: "2px solid", borderRadius: "10px", cursor: "pointer", borderColor: value?.[key] === "na" ? "#6b7280" : "#d1d5db", background: value?.[key] === "na" ? "#6b7280" : "#f9fafb", color: value?.[key] === "na" ? "#fff" : "#9ca3af", transition: "all 0.15s", fontFamily: "system-ui, sans-serif" }}>N/A</button>
+      {["ground", "platform"].map(key => {
+        const isMissing = key === "ground" ? missingGround : missingPlatform;
+        return (
+          <div key={key}>
+            <div style={{ fontSize: "0.65rem", fontWeight: 800, color: isMissing ? "#c2410c" : "#6b7280", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.25rem" }}>
+              {key === "ground" ? "G — Ground Control" : "P — Platform Control"}
+              {isMissing && <span style={{ marginLeft: "0.3rem" }}>— Required</span>}
+            </div>
+            <div style={{ display: "flex", gap: "0.5rem" }}>
+              <button onClick={() => onChange(key, value?.[key] === "pass" ? null : "pass")} style={{ flex: 1, padding: "0.8rem 0", fontSize: "0.95rem", fontWeight: 800, border: "2px solid", borderRadius: "10px", cursor: "pointer", borderColor: value?.[key] === "pass" ? "#16a34a" : "#d1d5db", background: value?.[key] === "pass" ? "#16a34a" : "#f9fafb", color: value?.[key] === "pass" ? "#fff" : "#9ca3af", transition: "all 0.15s", fontFamily: "system-ui, sans-serif" }}>✓ PASS</button>
+              <button onClick={() => onChange(key, value?.[key] === "fail" ? null : "fail")} style={{ flex: 1, padding: "0.8rem 0", fontSize: "0.95rem", fontWeight: 800, border: "2px solid", borderRadius: "10px", cursor: "pointer", borderColor: value?.[key] === "fail" ? "#dc2626" : "#d1d5db", background: value?.[key] === "fail" ? "#dc2626" : "#f9fafb", color: value?.[key] === "fail" ? "#fff" : "#9ca3af", transition: "all 0.15s", fontFamily: "system-ui, sans-serif" }}>✗ FAIL</button>
+              <button onClick={() => onChange(key, value?.[key] === "na" ? null : "na")} style={{ flex: 1, padding: "0.8rem 0", fontSize: "0.95rem", fontWeight: 800, border: "2px solid", borderRadius: "10px", cursor: "pointer", borderColor: value?.[key] === "na" ? "#6b7280" : "#d1d5db", background: value?.[key] === "na" ? "#6b7280" : "#f9fafb", color: value?.[key] === "na" ? "#fff" : "#9ca3af", transition: "all 0.15s", fontFamily: "system-ui, sans-serif" }}>N/A</button>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
 
-function VisualRow({ item, value, onChange }) {
+function VisualRow({ item, value, onChange, showError }) {
+  const missing = showError && !value;
   return (
-    <div style={{ padding: "1rem", borderBottom: "1px solid #f3f4f6", background: value === "pass" ? "#f0fdf4" : value === "fail" ? "#fef2f2" : value === "na" ? "#f3f4f6" : "#fff", transition: "background 0.2s" }}>
+    <div id={`item-${item.id}`} style={{ padding: "1rem", borderBottom: "1px solid #f3f4f6", background: value === "pass" ? "#f0fdf4" : value === "fail" ? "#fef2f2" : value === "na" ? "#f3f4f6" : missing ? "#fff7ed" : "#fff", boxShadow: missing ? "inset 0 0 0 2px #f97316" : "none", transition: "background 0.2s" }}>
       <div style={{ display: "flex", alignItems: "flex-start", gap: "0.6rem" }}>
-        <span style={{ minWidth: "1.8rem", height: "1.8rem", background: "#f3f4f6", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.7rem", fontWeight: 800, color: "#6b7280", fontFamily: "monospace" }}>{String(item.id).padStart(2,"0")}</span>
-        <span style={{ fontSize: "0.95rem", color: "#111827", lineHeight: 1.5, fontWeight: 500 }}>{item.text}</span>
+        <span style={{ minWidth: "1.8rem", height: "1.8rem", background: missing ? "#fed7aa" : "#f3f4f6", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.7rem", fontWeight: 800, color: missing ? "#c2410c" : "#6b7280", fontFamily: "monospace", flexShrink: 0 }}>{String(item.id).padStart(2,"0")}</span>
+        <div style={{ flex: 1 }}>
+          <span style={{ fontSize: "0.95rem", color: "#111827", lineHeight: 1.5, fontWeight: 500 }}>{item.text}</span>
+          {missing && <div style={{ fontSize: "0.72rem", color: "#c2410c", fontWeight: 700, marginTop: "0.25rem" }}>Answer required</div>}
+        </div>
       </div>
       <Toggle value={value} onChange={(val) => onChange(item.id, val)} />
     </div>
@@ -168,14 +178,17 @@ function ThoroughExamCard({ mewp }) {
   );
 }
 
-function FunctionRow({ item, value, onChange }) {
+function FunctionRow({ item, value, onChange, showError }) {
+  const missingGround = showError && !value?.ground;
+  const missingPlatform = showError && !value?.platform;
+  const anyMissing = missingGround || missingPlatform;
   return (
-    <div style={{ padding: "1rem", borderBottom: "1px solid #f3f4f6", background: value?.ground === "fail" || value?.platform === "fail" ? "#fef2f2" : value?.ground === "pass" && value?.platform === "pass" ? "#f0fdf4" : value?.ground === "na" && value?.platform === "na" ? "#f3f4f6" : "#fff" }}>
+    <div id={`item-${item.id}`} style={{ padding: "1rem", borderBottom: "1px solid #f3f4f6", background: value?.ground === "fail" || value?.platform === "fail" ? "#fef2f2" : value?.ground === "pass" && value?.platform === "pass" ? "#f0fdf4" : value?.ground === "na" && value?.platform === "na" ? "#f3f4f6" : anyMissing ? "#fff7ed" : "#fff", boxShadow: anyMissing ? "inset 0 0 0 2px #f97316" : "none" }}>
       <div style={{ display: "flex", alignItems: "flex-start", gap: "0.6rem" }}>
-        <span style={{ minWidth: "1.8rem", height: "1.8rem", background: "#f3f4f6", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.7rem", fontWeight: 800, color: "#6b7280", fontFamily: "monospace" }}>{String(item.id).padStart(2,"0")}</span>
+        <span style={{ minWidth: "1.8rem", height: "1.8rem", background: anyMissing ? "#fed7aa" : "#f3f4f6", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.7rem", fontWeight: 800, color: anyMissing ? "#c2410c" : "#6b7280", fontFamily: "monospace", flexShrink: 0 }}>{String(item.id).padStart(2,"0")}</span>
         <span style={{ fontSize: "0.95rem", color: "#111827", lineHeight: 1.5, fontWeight: 500 }}>{item.text}</span>
       </div>
-      <GPToggle value={value} onChange={(key, val) => onChange(item.id, key, val)} />
+      <GPToggle value={value} onChange={(key, val) => onChange(item.id, key, val)} missingGround={missingGround} missingPlatform={missingPlatform} />
     </div>
   );
 }
@@ -208,6 +221,7 @@ export default function CheckPage({ mewpId }) {
   const [defects, setDefects] = useState({});
   const [submitError, setSubmitError] = useState("");
   const [alreadyDoneFaults, setAlreadyDoneFaults] = useState([]);
+  const [showValidation, setShowValidation] = useState(false);
 
   useEffect(() => {
     if (!mewpId) return;
@@ -290,6 +304,28 @@ export default function CheckPage({ mewpId }) {
       setSubmitError(err.message);
       setPageStatus("submit_error");
     }
+  }
+
+  function handleVisualNext() {
+    const first = SECTIONS.flatMap(s => s.items).find(item => !visual[item.id]);
+    if (first) {
+      setShowValidation(true);
+      document.getElementById(`item-${first.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    setShowValidation(false);
+    setStep(2);
+  }
+
+  function handleFunctionNext() {
+    const first = FUNCTION_CHECKS.find(item => !fnChecks[item.id]?.ground || !fnChecks[item.id]?.platform);
+    if (first) {
+      setShowValidation(true);
+      document.getElementById(`item-${first.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    setShowValidation(false);
+    setStep(3);
   }
 
   const totalVisual = SECTIONS.reduce((a, s) => a + s.items.length, 0);
@@ -403,10 +439,13 @@ export default function CheckPage({ mewpId }) {
         {SECTIONS.map(section => (
           <div key={section.id} style={S.card}>
             <div style={S.cardHead()}><span style={{ fontSize: "1.1rem" }}>{section.emoji}</span><span style={S.cardHeadText}>{section.label}</span><span style={{ marginLeft: "auto", fontSize: "0.75rem", color: "#93c5fd", fontWeight: 700 }}>{section.items.filter(i => visual[i.id]).length}/{section.items.length}</span></div>
-            {section.items.map(item => <VisualRow key={item.id} item={item} value={visual[item.id]} onChange={(id, val) => setVisual(p => ({ ...p, [id]: val }))} />)}
+            {section.items.map(item => <VisualRow key={item.id} item={item} value={visual[item.id]} onChange={(id, val) => setVisual(p => ({ ...p, [id]: val }))} showError={showValidation} />)}
           </div>
         ))}
-        <div style={{ display: "flex", gap: "0.75rem" }}><button style={S.ghostBtn} onClick={() => setStep(0)}>← Back</button><button style={{ ...S.primaryBtn(), flex: 1 }} onClick={() => setStep(2)}>Function Checks →</button></div>
+        {showValidation && SECTIONS.flatMap(s => s.items).filter(item => !visual[item.id]).length > 0 && (
+          <div style={S.warningBox("#fff7ed", "#fed7aa", "#c2410c")}>⚠️ {SECTIONS.flatMap(s => s.items).filter(item => !visual[item.id]).length} question(s) still need an answer — items highlighted above in orange.</div>
+        )}
+        <div style={{ display: "flex", gap: "0.75rem" }}><button style={S.ghostBtn} onClick={() => { setShowValidation(false); setStep(0); }}>← Back</button><button style={{ ...S.primaryBtn(), flex: 1 }} onClick={handleVisualNext}>Function Checks →</button></div>
       </div>
     </div>
   );
@@ -419,9 +458,12 @@ export default function CheckPage({ mewpId }) {
         <div style={S.warningBox("#eff6ff", "#bfdbfe", "#1e40af")}>⚡ Test each item using both <strong>Ground (G)</strong> and <strong>Platform (P)</strong> controls.</div>
         <div style={S.card}>
           <div style={S.cardHead("#1e40af")}><span style={{ fontSize: "1.1rem" }}>🎮</span><span style={S.cardHeadText}>Function Checks — G & P</span></div>
-          {FUNCTION_CHECKS.map(item => <FunctionRow key={item.id} item={item} value={fnChecks[item.id]} onChange={(id, key, val) => setFnChecks(p => ({ ...p, [id]: { ...(p[id] || {}), [key]: val } }))} />)}
+          {FUNCTION_CHECKS.map(item => <FunctionRow key={item.id} item={item} value={fnChecks[item.id]} onChange={(id, key, val) => setFnChecks(p => ({ ...p, [id]: { ...(p[id] || {}), [key]: val } }))} showError={showValidation} />)}
         </div>
-        <div style={{ display: "flex", gap: "0.75rem" }}><button style={S.ghostBtn} onClick={() => setStep(1)}>← Back</button><button style={{ ...S.primaryBtn(), flex: 1 }} onClick={() => setStep(3)}>Review & Submit →</button></div>
+        {showValidation && FUNCTION_CHECKS.filter(item => !fnChecks[item.id]?.ground || !fnChecks[item.id]?.platform).length > 0 && (
+          <div style={S.warningBox("#fff7ed", "#fed7aa", "#c2410c")}>⚠️ {FUNCTION_CHECKS.filter(item => !fnChecks[item.id]?.ground || !fnChecks[item.id]?.platform).length} question(s) still need an answer — items highlighted above in orange.</div>
+        )}
+        <div style={{ display: "flex", gap: "0.75rem" }}><button style={S.ghostBtn} onClick={() => { setShowValidation(false); setStep(1); }}>← Back</button><button style={{ ...S.primaryBtn(), flex: 1 }} onClick={handleFunctionNext}>Review & Submit →</button></div>
       </div>
     </div>
   );
