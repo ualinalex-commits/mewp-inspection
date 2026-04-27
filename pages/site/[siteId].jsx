@@ -36,6 +36,20 @@ function fmtWeekDate(dateStr) {
   return `${d}/${m}/${y}`;
 }
 
+function formatDate(dateStr) {
+  if (!dateStr) return "";
+  const [y, m, d] = dateStr.split("-");
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return `${parseInt(d)} ${months[parseInt(m)-1]} ${y}`;
+}
+
+function isExamExpired(expiry) {
+  if (!expiry) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return new Date(expiry + "T00:00:00") < today;
+}
+
 const S = {
   app: { minHeight: "100vh", background: "#f3f4f6", fontFamily: "system-ui, -apple-system, sans-serif", color: "#111827", paddingBottom: "4rem" },
   logoBar: { background: "#fff", padding: "0.25rem 1rem", display: "flex", alignItems: "center", justifyContent: "center" },
@@ -196,6 +210,57 @@ function ReportsPanel({ mewpId }) {
   );
 }
 
+function ThoroughExamModal({ mewpId, currentExpiry, onClose, onSaved }) {
+  const [file, setFile] = useState(null);
+  const [expiry, setExpiry] = useState(currentExpiry || "");
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleUpload() {
+    if (!file || !expiry) return;
+    setUploading(true);
+    setError("");
+    try {
+      const ext = file.name.split(".").pop().toLowerCase();
+      const path = `${mewpId}/${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage.from("thorough-exams").upload(path, file, { upsert: true });
+      if (uploadErr) throw uploadErr;
+      const { data: { publicUrl } } = supabase.storage.from("thorough-exams").getPublicUrl(path);
+      const { error: updateErr } = await supabase.from("mewps").update({ thorough_exam_url: publicUrl, thorough_exam_expiry: expiry, thorough_exam_filename: file.name, thorough_exam_uploaded_at: new Date().toISOString() }).eq("id", mewpId);
+      if (updateErr) throw updateErr;
+      onSaved(publicUrl, expiry, file.name);
+    } catch (e) {
+      setError(e.message);
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 200, padding: "1rem" }}>
+      <div style={{ background: "#fff", borderRadius: "16px", width: "100%", maxWidth: "500px", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", boxShadow: "0 -4px 24px rgba(0,0,0,0.15)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#111827" }}>📄 Thorough Examination</div>
+          <button onClick={onClose} style={{ background: "#f3f4f6", border: "none", borderRadius: "50%", width: "2rem", height: "2rem", cursor: "pointer", fontSize: "1rem", color: "#374151" }}>×</button>
+        </div>
+        <div>
+          <label style={S.label}>Document / Image *</label>
+          <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={e => setFile(e.target.files?.[0] || null)} style={{ ...S.input, padding: "0.6rem 1rem", cursor: "pointer" }} />
+          {file && <div style={{ fontSize: "0.75rem", color: "#6b7280", marginTop: "0.3rem" }}>{file.name} ({(file.size / 1024).toFixed(1)} KB)</div>}
+        </div>
+        <div>
+          <label style={S.label}>Expiry Date *</label>
+          <input type="date" value={expiry} onChange={e => setExpiry(e.target.value)} style={S.input} />
+        </div>
+        {error && <div style={{ fontSize: "0.85rem", color: "#dc2626", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "8px", padding: "0.65rem" }}>{error}</div>}
+        <div style={{ display: "flex", gap: "0.75rem" }}>
+          <button style={{ ...S.ghostBtn(), flex: 1, padding: "0.85rem" }} onClick={onClose}>Cancel</button>
+          <button style={{ ...S.primaryBtn("#7c3aed"), flex: 2, opacity: (file && expiry && !uploading) ? 1 : 0.4 }} onClick={handleUpload} disabled={!file || !expiry || uploading}>{uploading ? "Uploading..." : "Upload"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MEWPCard({ mewp, todayInspection, initialPdfUrl, initialPdfGeneratedAt, isExpanded, onToggle, refreshKey, onArchive }) {
   const [showNFC, setShowNFC] = useState(false);
   const [faults, setFaults] = useState(null);
@@ -203,6 +268,8 @@ function MEWPCard({ mewp, todayInspection, initialPdfUrl, initialPdfGeneratedAt,
   const [archiving, setArchiving] = useState(false);
   const nfcUrl = mewp.nfc_url || `${BASE_URL}/check/${mewp.id}`;
   const hasFault = todayInspection?.daily_status === "fault";
+  const [examData, setExamData] = useState({ url: mewp.thorough_exam_url || null, expiry: mewp.thorough_exam_expiry || null, filename: mewp.thorough_exam_filename || null });
+  const [showExamModal, setShowExamModal] = useState(false);
 
   useEffect(() => {
     if (isExpanded && hasFault && todayInspection?.id && faults === null) loadFaultsData();
@@ -294,6 +361,49 @@ function MEWPCard({ mewp, todayInspection, initialPdfUrl, initialPdfGeneratedAt,
                 </div>
               ))}
             </div>
+          )}
+
+          {/* Thorough Examination */}
+          <div style={{ background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: "10px", padding: "0.85rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.5rem" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: "0.72rem", fontWeight: 800, color: "#7c3aed", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.4rem" }}>Thorough Examination</div>
+                {examData.url ? (
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                      {examData.expiry && (
+                        <>
+                          <span style={{ fontSize: "0.82rem", color: "#374151", fontWeight: 600 }}>Valid until {formatDate(examData.expiry)}</span>
+                          {isExamExpired(examData.expiry) ? (
+                            <span style={{ background: "#fecaca", color: "#991b1b", fontSize: "0.65rem", fontWeight: 800, padding: "0.15rem 0.5rem", borderRadius: "20px", textTransform: "uppercase" }}>Expired</span>
+                          ) : (
+                            <span style={{ background: "#bbf7d0", color: "#15803d", fontSize: "0.65rem", fontWeight: 800, padding: "0.15rem 0.5rem", borderRadius: "20px", textTransform: "uppercase" }}>Valid</span>
+                          )}
+                        </>
+                      )}
+                    </div>
+                    {examData.filename && <div style={{ fontSize: "0.7rem", color: "#9ca3af", marginTop: "0.2rem" }}>{examData.filename}</div>}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: "0.82rem", color: "#9ca3af" }}>No examination on file</div>
+                )}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem", flexShrink: 0 }}>
+                {examData.url && (
+                  <a href={examData.url} target="_blank" rel="noreferrer" style={{ background: "#7c3aed", color: "#fff", borderRadius: "8px", padding: "0.4rem 0.85rem", fontSize: "0.78rem", fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap", textAlign: "center" }}>Open File</a>
+                )}
+                <button style={{ background: "#fff", color: "#7c3aed", border: "2px solid #7c3aed55", borderRadius: "8px", padding: "0.4rem 0.85rem", fontSize: "0.78rem", fontWeight: 700, cursor: "pointer", fontFamily: "system-ui, sans-serif", whiteSpace: "nowrap" }} onClick={() => setShowExamModal(true)}>{examData.url ? "Update" : "Upload"}</button>
+              </div>
+            </div>
+          </div>
+
+          {showExamModal && (
+            <ThoroughExamModal
+              mewpId={mewp.id}
+              currentExpiry={examData.expiry}
+              onClose={() => setShowExamModal(false)}
+              onSaved={(url, expiry, filename) => { setExamData({ url, expiry, filename }); setShowExamModal(false); }}
+            />
           )}
 
           {/* Current week PDF */}

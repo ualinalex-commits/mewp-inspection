@@ -81,6 +81,20 @@ function getDayOfWeek(dateStr) {
   return days[new Date(y, m - 1, d).getDay()];
 }
 
+function formatDate(dateStr) {
+  if (!dateStr) return "";
+  const [y, m, d] = dateStr.split("-");
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return `${parseInt(d)} ${months[parseInt(m)-1]} ${y}`;
+}
+
+function isExamExpired(expiry) {
+  if (!expiry) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return new Date(expiry + "T00:00:00") < today;
+}
+
 function Toggle({ value, onChange }) {
   return (
     <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.6rem" }}>
@@ -114,6 +128,40 @@ function VisualRow({ item, value, onChange }) {
         <span style={{ fontSize: "0.95rem", color: "#111827", lineHeight: 1.5, fontWeight: 500 }}>{item.text}</span>
       </div>
       <Toggle value={value} onChange={(val) => onChange(item.id, val)} />
+    </div>
+  );
+}
+
+function ThoroughExamCard({ mewp }) {
+  if (!mewp) return null;
+  const { thorough_exam_url, thorough_exam_expiry, thorough_exam_filename } = mewp;
+  const expired = isExamExpired(thorough_exam_expiry);
+  return (
+    <div style={{ background: "#fff", borderRadius: "12px", overflow: "hidden", marginBottom: "1rem", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
+      <div style={{ background: "#7c3aed", padding: "0.75rem 1rem", display: "flex", alignItems: "center", gap: "0.6rem" }}>
+        <span style={{ fontSize: "1.1rem" }}>📄</span>
+        <span style={{ fontSize: "0.8rem", fontWeight: 800, color: "#fff", letterSpacing: "0.04em", textTransform: "uppercase" }}>Thorough Examination</span>
+        {thorough_exam_url && (
+          <span style={{ marginLeft: "auto", background: expired ? "#fecaca" : "#bbf7d0", color: expired ? "#991b1b" : "#15803d", fontSize: "0.65rem", fontWeight: 800, padding: "0.15rem 0.5rem", borderRadius: "20px", textTransform: "uppercase" }}>{expired ? "Expired" : "Valid"}</span>
+        )}
+      </div>
+      <div style={{ padding: "1rem" }}>
+        {!thorough_exam_url ? (
+          <div style={{ fontSize: "0.88rem", color: "#9ca3af", fontWeight: 600 }}>No thorough examination available</div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
+            {thorough_exam_expiry && (
+              <div style={{ fontSize: "0.9rem", color: expired ? "#b91c1c" : "#374151", fontWeight: 600 }}>
+                Valid until {formatDate(thorough_exam_expiry)}
+              </div>
+            )}
+            {expired && (
+              <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "8px", padding: "0.6rem 0.85rem", fontSize: "0.82rem", color: "#991b1b", fontWeight: 600 }}>⚠️ This thorough examination has expired. Notify your supervisor.</div>
+            )}
+            <a href={thorough_exam_url} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", background: "#7c3aed", color: "#fff", borderRadius: "8px", padding: "0.7rem 1.2rem", fontSize: "0.9rem", fontWeight: 700, textDecoration: "none", alignSelf: "flex-start" }}>📄 Open Document</a>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -266,6 +314,7 @@ export default function CheckPage({ mewpId }) {
             ))}
           </div>
         </div>
+        <ThoroughExamCard mewp={mewp} />
         <div style={S.warningBox("#f0fdf4", "#bbf7d0", "#15803d")}>✅ No action needed. If you believe this is an error, contact your site manager.</div>
         {existingEntry.daily_status === "fault" && alreadyDoneFaults.length > 0 && (
           <div style={{ marginTop: "0.5rem" }}>
@@ -315,6 +364,7 @@ export default function CheckPage({ mewpId }) {
               ))}
             </div>
           )}
+          <ThoroughExamCard mewp={mewp} />
         </div>
       </div>
     );
@@ -332,6 +382,7 @@ export default function CheckPage({ mewpId }) {
             <div><label style={S.label}>PAL Card Number</label><input type="text" placeholder="e.g. PAL-123456" value={operator.palCard} onChange={e => setOperator(p => ({ ...p, palCard: e.target.value }))} style={S.input} /></div>
           </div>
         </div>
+        <ThoroughExamCard mewp={mewp} />
         <div style={S.warningBox("#fffbeb", "#fde68a", "#92400e")}>⚡ Only trained and authorised persons should operate this equipment. All faults must be reported to your supervisor immediately.</div>
         <button style={S.primaryBtn("#1d4ed8", !operator.name.trim())} onClick={() => operator.name.trim() && setStep(1)}>Start Visual Checks →</button>
       </div>
