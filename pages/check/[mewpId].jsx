@@ -100,6 +100,7 @@ function Toggle({ value, onChange }) {
     <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.6rem" }}>
       <button onClick={() => onChange(value === "pass" ? null : "pass")} style={{ flex: 1, padding: "0.9rem 0", fontSize: "1.05rem", fontWeight: 800, border: "2px solid", borderRadius: "10px", cursor: "pointer", borderColor: value === "pass" ? "#16a34a" : "#d1d5db", background: value === "pass" ? "#16a34a" : "#f9fafb", color: value === "pass" ? "#fff" : "#9ca3af", transition: "all 0.15s", fontFamily: "system-ui, sans-serif" }}>✓ PASS</button>
       <button onClick={() => onChange(value === "fail" ? null : "fail")} style={{ flex: 1, padding: "0.9rem 0", fontSize: "1.05rem", fontWeight: 800, border: "2px solid", borderRadius: "10px", cursor: "pointer", borderColor: value === "fail" ? "#dc2626" : "#d1d5db", background: value === "fail" ? "#dc2626" : "#f9fafb", color: value === "fail" ? "#fff" : "#9ca3af", transition: "all 0.15s", fontFamily: "system-ui, sans-serif" }}>✗ FAIL</button>
+      <button onClick={() => onChange(value === "na" ? null : "na")} style={{ flex: 1, padding: "0.9rem 0", fontSize: "1.05rem", fontWeight: 800, border: "2px solid", borderRadius: "10px", cursor: "pointer", borderColor: value === "na" ? "#6b7280" : "#d1d5db", background: value === "na" ? "#6b7280" : "#f9fafb", color: value === "na" ? "#fff" : "#9ca3af", transition: "all 0.15s", fontFamily: "system-ui, sans-serif" }}>N/A</button>
     </div>
   );
 }
@@ -113,6 +114,7 @@ function GPToggle({ value, onChange }) {
           <div style={{ display: "flex", gap: "0.5rem" }}>
             <button onClick={() => onChange(key, value?.[key] === "pass" ? null : "pass")} style={{ flex: 1, padding: "0.8rem 0", fontSize: "0.95rem", fontWeight: 800, border: "2px solid", borderRadius: "10px", cursor: "pointer", borderColor: value?.[key] === "pass" ? "#16a34a" : "#d1d5db", background: value?.[key] === "pass" ? "#16a34a" : "#f9fafb", color: value?.[key] === "pass" ? "#fff" : "#9ca3af", transition: "all 0.15s", fontFamily: "system-ui, sans-serif" }}>✓ PASS</button>
             <button onClick={() => onChange(key, value?.[key] === "fail" ? null : "fail")} style={{ flex: 1, padding: "0.8rem 0", fontSize: "0.95rem", fontWeight: 800, border: "2px solid", borderRadius: "10px", cursor: "pointer", borderColor: value?.[key] === "fail" ? "#dc2626" : "#d1d5db", background: value?.[key] === "fail" ? "#dc2626" : "#f9fafb", color: value?.[key] === "fail" ? "#fff" : "#9ca3af", transition: "all 0.15s", fontFamily: "system-ui, sans-serif" }}>✗ FAIL</button>
+            <button onClick={() => onChange(key, value?.[key] === "na" ? null : "na")} style={{ flex: 1, padding: "0.8rem 0", fontSize: "0.95rem", fontWeight: 800, border: "2px solid", borderRadius: "10px", cursor: "pointer", borderColor: value?.[key] === "na" ? "#6b7280" : "#d1d5db", background: value?.[key] === "na" ? "#6b7280" : "#f9fafb", color: value?.[key] === "na" ? "#fff" : "#9ca3af", transition: "all 0.15s", fontFamily: "system-ui, sans-serif" }}>N/A</button>
           </div>
         </div>
       ))}
@@ -122,7 +124,7 @@ function GPToggle({ value, onChange }) {
 
 function VisualRow({ item, value, onChange }) {
   return (
-    <div style={{ padding: "1rem", borderBottom: "1px solid #f3f4f6", background: value === "pass" ? "#f0fdf4" : value === "fail" ? "#fef2f2" : "#fff", transition: "background 0.2s" }}>
+    <div style={{ padding: "1rem", borderBottom: "1px solid #f3f4f6", background: value === "pass" ? "#f0fdf4" : value === "fail" ? "#fef2f2" : value === "na" ? "#f3f4f6" : "#fff", transition: "background 0.2s" }}>
       <div style={{ display: "flex", alignItems: "flex-start", gap: "0.6rem" }}>
         <span style={{ minWidth: "1.8rem", height: "1.8rem", background: "#f3f4f6", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.7rem", fontWeight: 800, color: "#6b7280", fontFamily: "monospace" }}>{String(item.id).padStart(2,"0")}</span>
         <span style={{ fontSize: "0.95rem", color: "#111827", lineHeight: 1.5, fontWeight: 500 }}>{item.text}</span>
@@ -168,7 +170,7 @@ function ThoroughExamCard({ mewp }) {
 
 function FunctionRow({ item, value, onChange }) {
   return (
-    <div style={{ padding: "1rem", borderBottom: "1px solid #f3f4f6", background: value?.ground === "fail" || value?.platform === "fail" ? "#fef2f2" : value?.ground === "pass" && value?.platform === "pass" ? "#f0fdf4" : "#fff" }}>
+    <div style={{ padding: "1rem", borderBottom: "1px solid #f3f4f6", background: value?.ground === "fail" || value?.platform === "fail" ? "#fef2f2" : value?.ground === "pass" && value?.platform === "pass" ? "#f0fdf4" : value?.ground === "na" && value?.platform === "na" ? "#f3f4f6" : "#fff" }}>
       <div style={{ display: "flex", alignItems: "flex-start", gap: "0.6rem" }}>
         <span style={{ minWidth: "1.8rem", height: "1.8rem", background: "#f3f4f6", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.7rem", fontWeight: 800, color: "#6b7280", fontFamily: "monospace" }}>{String(item.id).padStart(2,"0")}</span>
         <span style={{ fontSize: "0.95rem", color: "#111827", lineHeight: 1.5, fontWeight: 500 }}>{item.text}</span>
@@ -222,6 +224,10 @@ export default function CheckPage({ mewpId }) {
     }
     load();
   }, [mewpId]);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [step]);
 
   useEffect(() => {
     if (pageStatus === "already_done" && existingEntry?.daily_status === "fault" && existingEntry?.id) {
