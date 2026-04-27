@@ -45,11 +45,11 @@ for (let i = 29; i <= 43; i++) {
 }
 
 const operatorsByDay = {
-  Mon: { operator_name: 'Alice Worker',  pal_card_number: 'PAL00123', daily_status: 'ok',    inspection_date: '2026-04-21', created_at: '2026-04-21T07:42:00Z' },
-  Tue: { operator_name: 'Bob Builder',   pal_card_number: 'PAL00456', daily_status: 'fault', inspection_date: '2026-04-22', created_at: '2026-04-22T08:15:00Z' },
-  Wed: { operator_name: 'Carol Jones',   pal_card_number: 'PAL00789', daily_status: 'ok',    inspection_date: '2026-04-23', created_at: '2026-04-23T07:55:00Z' },
-  Thu: { operator_name: 'Dave Smith',    pal_card_number: 'PAL00321', daily_status: 'ok',    inspection_date: '2026-04-24', created_at: '2026-04-24T08:00:00Z' },
-  Fri: { operator_name: 'Eve Taylor',    pal_card_number: 'PAL00654', daily_status: 'fault', inspection_date: '2026-04-25', created_at: '2026-04-25T07:30:00Z' },
+  Mon: { operator_name: 'Alice Worker',  pal_card_number: 'PAL00123', daily_status: 'ok',    inspection_date: '2026-04-21', submitted_at: '2026-04-21T07:42:00Z' },
+  Tue: { operator_name: 'Bob Builder',   pal_card_number: 'PAL00456', daily_status: 'fault', inspection_date: '2026-04-22', submitted_at: '2026-04-22T08:15:00Z' },
+  Wed: { operator_name: 'Carol Jones',   pal_card_number: 'PAL00789', daily_status: 'ok',    inspection_date: '2026-04-23', submitted_at: '2026-04-23T07:55:00Z' },
+  Thu: { operator_name: 'Dave Smith',    pal_card_number: 'PAL00321', daily_status: 'ok',    inspection_date: '2026-04-24', submitted_at: '2026-04-24T08:00:00Z' },
+  Fri: { operator_name: 'Eve Taylor',    pal_card_number: 'PAL00654', daily_status: 'fault', inspection_date: '2026-04-25', submitted_at: '2026-04-25T07:30:00Z' },
   // Saturday and Sunday intentionally omitted (no inspection those days)
 };
 
