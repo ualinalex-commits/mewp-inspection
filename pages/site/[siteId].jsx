@@ -195,7 +195,7 @@ function ReportsPanel({ mewpId }) {
                 )}
               </div>
               <a
-                href={r.pdf_url}
+                href={r.pdf_url ? `${r.pdf_url}${r.pdf_url.includes('?') ? '&' : '?'}t=${Date.now()}` : r.pdf_url}
                 target="_blank"
                 rel="noreferrer"
                 style={{ background: "#15803d", color: "#fff", borderRadius: "8px", padding: "0.4rem 0.85rem", fontSize: "0.78rem", fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap", flexShrink: 0 }}
@@ -409,7 +409,7 @@ function MEWPCard({ mewp, todayInspection, initialPdfUrl, initialPdfGeneratedAt,
           {/* Current week PDF */}
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
             {initialPdfUrl ? (
-              <a href={initialPdfUrl} target="_blank" rel="noreferrer" style={{ background: "#fff", color: "#15803d", border: "2px solid #15803d55", borderRadius: "10px", padding: "0.65rem 1rem", fontSize: "0.82rem", fontWeight: 700, cursor: "pointer", fontFamily: "system-ui, sans-serif", whiteSpace: "nowrap", textDecoration: "none" }}>View PDF</a>
+              <a href={`${initialPdfUrl}${initialPdfUrl.includes('?') ? '&' : '?'}t=${Date.now()}`} target="_blank" rel="noreferrer" style={{ background: "#fff", color: "#15803d", border: "2px solid #15803d55", borderRadius: "10px", padding: "0.65rem 1rem", fontSize: "0.82rem", fontWeight: 700, cursor: "pointer", fontFamily: "system-ui, sans-serif", whiteSpace: "nowrap", textDecoration: "none" }}>View PDF</a>
             ) : (
               <span style={{ background: "#f9fafb", color: "#9ca3af", border: "2px solid #e5e7eb", borderRadius: "10px", padding: "0.65rem 1rem", fontSize: "0.82rem", fontWeight: 700, fontFamily: "system-ui, sans-serif", whiteSpace: "nowrap" }}>No PDF yet</span>
             )}
