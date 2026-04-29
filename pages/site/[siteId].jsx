@@ -262,7 +262,7 @@ function ThoroughExamModal({ mewpId, currentExpiry, onClose, onSaved }) {
   );
 }
 
-function MEWPCard({ mewp, todayInspection, initialPdfUrl, initialPdfGeneratedAt, isExpanded, onToggle, refreshKey, onArchive }) {
+function MEWPCard({ mewp, todayInspection, initialPdfUrl, initialPdfGeneratedAt, isExpanded, onToggle, refreshKey, onArchive, isAdmin }) {
   const [showNFC, setShowNFC] = useState(false);
   const [faults, setFaults] = useState(null);
   const [loadingFaults, setLoadingFaults] = useState(false);
@@ -393,7 +393,7 @@ function MEWPCard({ mewp, todayInspection, initialPdfUrl, initialPdfGeneratedAt,
                 {examData.url && (
                   <a href={examData.url} target="_blank" rel="noreferrer" style={{ background: "#7c3aed", color: "#fff", borderRadius: "8px", padding: "0.4rem 0.85rem", fontSize: "0.78rem", fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap", textAlign: "center" }}>Open File</a>
                 )}
-                <button style={{ background: "#fff", color: "#7c3aed", border: "2px solid #7c3aed55", borderRadius: "8px", padding: "0.4rem 0.85rem", fontSize: "0.78rem", fontWeight: 700, cursor: "pointer", fontFamily: "system-ui, sans-serif", whiteSpace: "nowrap" }} onClick={() => setShowExamModal(true)}>{examData.url ? "Update" : "Upload"}</button>
+                {isAdmin && <button style={{ background: "#fff", color: "#7c3aed", border: "2px solid #7c3aed55", borderRadius: "8px", padding: "0.4rem 0.85rem", fontSize: "0.78rem", fontWeight: 700, cursor: "pointer", fontFamily: "system-ui, sans-serif", whiteSpace: "nowrap" }} onClick={() => setShowExamModal(true)}>{examData.url ? "Update" : "Upload"}</button>}
               </div>
             </div>
           </div>
@@ -436,24 +436,26 @@ function MEWPCard({ mewp, todayInspection, initialPdfUrl, initialPdfGeneratedAt,
             </div>
           )}
 
-          {/* Archive toggle */}
-          <div style={{ paddingTop: "0.75rem", borderTop: "1px solid #f3f4f6" }}>
-            <div style={{ fontSize: "0.72rem", fontWeight: 800, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>Machine Status</div>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-              <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#15803d" }}>Active</span>
-              <div
-                onClick={archiving ? undefined : handleArchive}
-                role="switch"
-                aria-checked="true"
-                style={{ width: "44px", height: "24px", background: "#1d4ed8", borderRadius: "12px", cursor: archiving ? "not-allowed" : "pointer", position: "relative", flexShrink: 0, opacity: archiving ? 0.5 : 1, transition: "opacity 0.2s" }}
-              >
-                <span style={{ position: "absolute", top: "3px", left: "3px", width: "18px", height: "18px", background: "#fff", borderRadius: "50%", boxShadow: "0 1px 3px rgba(0,0,0,0.2)", display: "block" }} />
+          {/* Archive toggle — admin only */}
+          {isAdmin && (
+            <div style={{ paddingTop: "0.75rem", borderTop: "1px solid #f3f4f6" }}>
+              <div style={{ fontSize: "0.72rem", fontWeight: 800, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>Machine Status</div>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#15803d" }}>Active</span>
+                <div
+                  onClick={archiving ? undefined : handleArchive}
+                  role="switch"
+                  aria-checked="true"
+                  style={{ width: "44px", height: "24px", background: "#1d4ed8", borderRadius: "12px", cursor: archiving ? "not-allowed" : "pointer", position: "relative", flexShrink: 0, opacity: archiving ? 0.5 : 1, transition: "opacity 0.2s" }}
+                >
+                  <span style={{ position: "absolute", top: "3px", left: "3px", width: "18px", height: "18px", background: "#fff", borderRadius: "50%", boxShadow: "0 1px 3px rgba(0,0,0,0.2)", display: "block" }} />
+                </div>
+                <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#9ca3af" }}>Archived</span>
+                {archiving && <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>Archiving...</span>}
               </div>
-              <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#9ca3af" }}>Archived</span>
-              {archiving && <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>Archiving...</span>}
+              <div style={{ fontSize: "0.72rem", color: "#9ca3af", marginTop: "0.35rem" }}>Switch to Archived to remove from daily inspection list</div>
             </div>
-            <div style={{ fontSize: "0.72rem", color: "#9ca3af", marginTop: "0.35rem" }}>Switch to Archived to remove from daily inspection list</div>
-          </div>
+          )}
 
         </div>
       </div>
@@ -461,7 +463,7 @@ function MEWPCard({ mewp, todayInspection, initialPdfUrl, initialPdfGeneratedAt,
   );
 }
 
-function ArchivedMEWPCard({ mewp, onRestore }) {
+function ArchivedMEWPCard({ mewp, onRestore, isAdmin }) {
   const [expanded, setExpanded] = useState(false);
   const [restoring, setRestoring] = useState(false);
 
@@ -491,24 +493,26 @@ function ArchivedMEWPCard({ mewp, onRestore }) {
 
           <ReportsPanel mewpId={mewp.id} />
 
-          {/* Restore toggle */}
-          <div style={{ paddingTop: "0.75rem", borderTop: "1px solid #f3f4f6" }}>
-            <div style={{ fontSize: "0.72rem", fontWeight: 800, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>Machine Status</div>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-              <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#9ca3af" }}>Active</span>
-              <div
-                onClick={restoring ? undefined : handleRestore}
-                role="switch"
-                aria-checked="false"
-                style={{ width: "44px", height: "24px", background: "#e5e7eb", borderRadius: "12px", cursor: restoring ? "not-allowed" : "pointer", position: "relative", flexShrink: 0, opacity: restoring ? 0.5 : 1, transition: "opacity 0.2s" }}
-              >
-                <span style={{ position: "absolute", top: "3px", left: "23px", width: "18px", height: "18px", background: "#fff", borderRadius: "50%", boxShadow: "0 1px 3px rgba(0,0,0,0.2)", display: "block" }} />
+          {/* Restore toggle — admin only */}
+          {isAdmin && (
+            <div style={{ paddingTop: "0.75rem", borderTop: "1px solid #f3f4f6" }}>
+              <div style={{ fontSize: "0.72rem", fontWeight: 800, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>Machine Status</div>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#9ca3af" }}>Active</span>
+                <div
+                  onClick={restoring ? undefined : handleRestore}
+                  role="switch"
+                  aria-checked="false"
+                  style={{ width: "44px", height: "24px", background: "#e5e7eb", borderRadius: "12px", cursor: restoring ? "not-allowed" : "pointer", position: "relative", flexShrink: 0, opacity: restoring ? 0.5 : 1, transition: "opacity 0.2s" }}
+                >
+                  <span style={{ position: "absolute", top: "3px", left: "23px", width: "18px", height: "18px", background: "#fff", borderRadius: "50%", boxShadow: "0 1px 3px rgba(0,0,0,0.2)", display: "block" }} />
+                </div>
+                <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#6b7280" }}>Archived</span>
+                {restoring && <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>Restoring...</span>}
               </div>
-              <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#6b7280" }}>Archived</span>
-              {restoring && <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>Restoring...</span>}
+              <div style={{ fontSize: "0.72rem", color: "#9ca3af", marginTop: "0.35rem" }}>Switch to Active to restore to daily inspection list</div>
             </div>
-            <div style={{ fontSize: "0.72rem", color: "#9ca3af", marginTop: "0.35rem" }}>Switch to Active to restore to daily inspection list</div>
-          </div>
+          )}
 
         </div>
       </div>
@@ -518,7 +522,7 @@ function ArchivedMEWPCard({ mewp, onRestore }) {
 
 export default function SiteDashboard({ siteId }) {
   const router = useRouter();
-  const [authLoading, setAuthLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [site, setSite] = useState(null);
   const [mewps, setMewps] = useState([]);
@@ -537,27 +541,25 @@ export default function SiteDashboard({ siteId }) {
   const mewpsRef = useRef([]);
   const siteUrl = `${BASE_URL}/site/${siteId}`;
 
-  useEffect(() => { checkAuth(); }, []);
+  useEffect(() => { checkAdminStatus(); }, [siteId]);
   useEffect(() => { showArchivedRef.current = showArchived; }, [showArchived]);
   useEffect(() => { mewpsRef.current = mewps; }, [mewps]);
 
   useEffect(() => { if (siteId) loadData(); }, [siteId]);
 
-  async function checkAuth() {
+  async function checkAdminStatus() {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { router.replace("/login"); return; }
-    const { data: profile } = await supabase.from("user_profiles").select("role, site_id, must_change_password").eq("id", session.user.id).single();
-    if (!profile) { await supabase.auth.signOut(); router.replace("/login"); return; }
-    if (profile.must_change_password) { router.replace("/login"); return; }
-    if (profile.role === "site_admin" && profile.site_id !== siteId) {
-      router.replace(`/site/${profile.site_id}`);
-      return;
+    if (!session) return;
+    const { data: profile } = await supabase.from("user_profiles").select("role, site_id").eq("id", session.user.id).single();
+    if (!profile) return;
+    if (profile.role === "main_admin" || (profile.role === "site_admin" && profile.site_id === siteId)) {
+      setIsAdmin(true);
     }
-    setAuthLoading(false);
   }
 
   async function handleLogout() {
     await supabase.auth.signOut();
+    setIsAdmin(false);
     router.push("/login");
   }
 
@@ -753,7 +755,7 @@ export default function SiteDashboard({ siteId }) {
     }
   }
 
-  if (authLoading || loading) return <div style={{ ...S.app, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ textAlign: "center" }}><div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>⏳</div><div style={{ color: "#6b7280" }}>Loading site...</div></div></div>;
+  if (loading) return <div style={{ ...S.app, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ textAlign: "center" }}><div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>⏳</div><div style={{ color: "#6b7280" }}>Loading site...</div></div></div>;
   if (!site) return <div style={{ ...S.app, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ textAlign: "center" }}><div style={{ fontSize: "3rem", marginBottom: "0.75rem" }}>⚠️</div><div style={{ fontSize: "1rem", fontWeight: 800, color: "#dc2626" }}>Site not found</div></div></div>;
 
   const pendingCount = stats.total - stats.doneToday;
@@ -774,7 +776,7 @@ export default function SiteDashboard({ siteId }) {
         </div>
         <div style={{ display: "flex", gap: "0.5rem" }}>
           <button style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: "8px", color: "#fff", padding: "0.5rem 0.75rem", cursor: "pointer", fontSize: "0.8rem", fontWeight: 700 }} onClick={loadData}>↻</button>
-          <button style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: "8px", color: "#fff", padding: "0.5rem 0.75rem", cursor: "pointer", fontSize: "0.8rem", fontWeight: 700 }} onClick={handleLogout}>Logout</button>
+          {isAdmin && <button style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: "8px", color: "#fff", padding: "0.5rem 0.75rem", cursor: "pointer", fontSize: "0.8rem", fontWeight: 700 }} onClick={handleLogout}>Logout</button>}
         </div>
       </div>
 
@@ -825,13 +827,13 @@ export default function SiteDashboard({ siteId }) {
           <div style={S.cardHead()}>
             <span style={{ fontSize: "1.1rem" }}>🏗️</span>
             <span style={S.cardHeadText}>MEWPs on Site</span>
-            <button style={{ marginLeft: "auto", background: "#fff", color: "#1d4ed8", border: "none", borderRadius: "8px", padding: "0.4rem 0.85rem", fontSize: "0.8rem", fontWeight: 800, cursor: "pointer" }} onClick={() => setShowAddModal(true)}>+ Add</button>
+            {isAdmin && <button style={{ marginLeft: "auto", background: "#fff", color: "#1d4ed8", border: "none", borderRadius: "8px", padding: "0.4rem 0.85rem", fontSize: "0.8rem", fontWeight: 800, cursor: "pointer" }} onClick={() => setShowAddModal(true)}>+ Add</button>}
           </div>
           {mewps.length === 0 && (
             <div style={{ padding: "2.5rem", textAlign: "center" }}>
               <div style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}>🏗️</div>
-              <div style={{ fontSize: "1rem", color: "#6b7280", marginBottom: "1.5rem", fontWeight: 600 }}>No MEWPs added yet</div>
-              <button style={{ ...S.primaryBtn(), maxWidth: "220px", margin: "0 auto" }} onClick={() => setShowAddModal(true)}>+ Add First MEWP</button>
+              <div style={{ fontSize: "1rem", color: "#6b7280", marginBottom: isAdmin ? "1.5rem" : 0, fontWeight: 600 }}>No MEWPs added yet</div>
+              {isAdmin && <button style={{ ...S.primaryBtn(), maxWidth: "220px", margin: "0 auto" }} onClick={() => setShowAddModal(true)}>+ Add First MEWP</button>}
             </div>
           )}
         </div>
@@ -850,6 +852,7 @@ export default function SiteDashboard({ siteId }) {
                 onToggle={() => handleToggle(mewp.id)}
                 refreshKey={rtRefreshKey}
                 onArchive={handleArchiveMewp}
+                isAdmin={isAdmin}
               />
             </div>
           );
@@ -878,6 +881,7 @@ export default function SiteDashboard({ siteId }) {
                   key={mewp.id}
                   mewp={mewp}
                   onRestore={id => handleArchiveMewp(id, false)}
+                  isAdmin={isAdmin}
                 />
               ))}
             </div>
