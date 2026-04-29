@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/router";
 import { supabase } from "../../lib/supabase";
 import QRCode from "qrcode";
 
@@ -516,6 +517,8 @@ function ArchivedMEWPCard({ mewp, onRestore }) {
 }
 
 export default function SiteDashboard({ siteId }) {
+  const router = useRouter();
+  const [authLoading, setAuthLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [site, setSite] = useState(null);
   const [mewps, setMewps] = useState([]);
@@ -534,10 +537,29 @@ export default function SiteDashboard({ siteId }) {
   const mewpsRef = useRef([]);
   const siteUrl = `${BASE_URL}/site/${siteId}`;
 
+  useEffect(() => { checkAuth(); }, []);
   useEffect(() => { showArchivedRef.current = showArchived; }, [showArchived]);
   useEffect(() => { mewpsRef.current = mewps; }, [mewps]);
 
   useEffect(() => { if (siteId) loadData(); }, [siteId]);
+
+  async function checkAuth() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { router.replace("/login"); return; }
+    const { data: profile } = await supabase.from("user_profiles").select("role, site_id, must_change_password").eq("id", session.user.id).single();
+    if (!profile) { await supabase.auth.signOut(); router.replace("/login"); return; }
+    if (profile.must_change_password) { router.replace("/login"); return; }
+    if (profile.role === "site_admin" && profile.site_id !== siteId) {
+      router.replace(`/site/${profile.site_id}`);
+      return;
+    }
+    setAuthLoading(false);
+  }
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    router.push("/login");
+  }
 
   useEffect(() => {
     if (!siteId) return;
@@ -731,7 +753,7 @@ export default function SiteDashboard({ siteId }) {
     }
   }
 
-  if (loading) return <div style={{ ...S.app, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ textAlign: "center" }}><div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>⏳</div><div style={{ color: "#6b7280" }}>Loading site...</div></div></div>;
+  if (authLoading || loading) return <div style={{ ...S.app, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ textAlign: "center" }}><div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>⏳</div><div style={{ color: "#6b7280" }}>Loading site...</div></div></div>;
   if (!site) return <div style={{ ...S.app, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ textAlign: "center" }}><div style={{ fontSize: "3rem", marginBottom: "0.75rem" }}>⚠️</div><div style={{ fontSize: "1rem", fontWeight: 800, color: "#dc2626" }}>Site not found</div></div></div>;
 
   const pendingCount = stats.total - stats.doneToday;
@@ -750,7 +772,10 @@ export default function SiteDashboard({ siteId }) {
           )}
           <div style={{ fontSize: "0.72rem", color: "#bfdbfe" }}>Site Manager Dashboard</div>
         </div>
-        <button style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: "8px", color: "#fff", padding: "0.5rem 0.75rem", cursor: "pointer", fontSize: "0.8rem", fontWeight: 700 }} onClick={loadData}>↻</button>
+        <div style={{ display: "flex", gap: "0.5rem" }}>
+          <button style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: "8px", color: "#fff", padding: "0.5rem 0.75rem", cursor: "pointer", fontSize: "0.8rem", fontWeight: 700 }} onClick={loadData}>↻</button>
+          <button style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: "8px", color: "#fff", padding: "0.5rem 0.75rem", cursor: "pointer", fontSize: "0.8rem", fontWeight: 700 }} onClick={handleLogout}>Logout</button>
+        </div>
       </div>
 
       <div style={S.container}>
