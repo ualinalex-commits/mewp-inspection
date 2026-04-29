@@ -523,6 +523,7 @@ function ArchivedMEWPCard({ mewp, onRestore, isAdmin }) {
 export default function SiteDashboard({ siteId }) {
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [site, setSite] = useState(null);
   const [mewps, setMewps] = useState([]);
@@ -549,12 +550,12 @@ export default function SiteDashboard({ siteId }) {
 
   async function checkAdminStatus() {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
+    if (!session) { setAuthChecked(true); return; }
     const { data: profile } = await supabase.from("user_profiles").select("role, site_id").eq("id", session.user.id).single();
-    if (!profile) return;
-    if (profile.role === "main_admin" || (profile.role === "site_admin" && profile.site_id === siteId)) {
+    if (profile && (profile.role === "main_admin" || (profile.role === "site_admin" && profile.site_id === siteId))) {
       setIsAdmin(true);
     }
+    setAuthChecked(true);
   }
 
   async function handleLogout() {
@@ -776,7 +777,12 @@ export default function SiteDashboard({ siteId }) {
         </div>
         <div style={{ display: "flex", gap: "0.5rem" }}>
           <button style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: "8px", color: "#fff", padding: "0.5rem 0.75rem", cursor: "pointer", fontSize: "0.8rem", fontWeight: 700 }} onClick={loadData}>↻</button>
-          {isAdmin && <button style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: "8px", color: "#fff", padding: "0.5rem 0.75rem", cursor: "pointer", fontSize: "0.8rem", fontWeight: 700 }} onClick={handleLogout}>Logout</button>}
+          {authChecked && !isAdmin && (
+            <button style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: "8px", color: "#fff", padding: "0.5rem 0.75rem", cursor: "pointer", fontSize: "0.8rem", fontWeight: 700 }} onClick={() => router.push("/login")}>Login</button>
+          )}
+          {isAdmin && (
+            <button style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: "8px", color: "#fff", padding: "0.5rem 0.75rem", cursor: "pointer", fontSize: "0.8rem", fontWeight: 700 }} onClick={handleLogout}>Logout</button>
+          )}
         </div>
       </div>
 
