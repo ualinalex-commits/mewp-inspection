@@ -299,6 +299,17 @@ export default function CheckPage({ mewpId }) {
   }, [photoPreview]);
 
   async function handleSubmit() {
+    // Capture these synchronously BEFORE any state change or await — once
+    // setPageStatus("submitting") triggers a re-render, the step 3 canvas
+    // unmounts and the useEffect cleanup nulls out sigPadRef.current.
+    const photoFile = photo;
+    const sigDataUrl = (sigPadRef.current && !sigPadRef.current.isEmpty())
+      ? sigPadRef.current.toDataURL("image/png")
+      : null;
+
+    console.log("[upload] starting photo upload", photoFile);
+    console.log("[upload] starting signature upload", sigDataUrl ? sigDataUrl.slice(0, 60) + "…" : null);
+
     setPageStatus("submitting");
     let entryId = null;
     try {
@@ -331,10 +342,10 @@ export default function CheckPage({ mewpId }) {
 
       const uploads = [];
 
-      if (photo) {
+      if (photoFile) {
         uploads.push(
           supabase.storage.from("mewp-photos")
-            .upload(`${siteId}/${mewpId}/${entryId}.jpg`, photo, { contentType: photo.type, upsert: true })
+            .upload(`${siteId}/${mewpId}/${entryId}.jpg`, photoFile, { contentType: photoFile.type, upsert: true })
             .then(({ error }) => {
               if (error) {
                 console.error("[upload] photo upload error:", error.message);
@@ -347,8 +358,7 @@ export default function CheckPage({ mewpId }) {
         );
       }
 
-      if (sigPadRef.current && !sigPadRef.current.isEmpty()) {
-        const sigDataUrl = sigPadRef.current.toDataURL("image/png");
+      if (sigDataUrl) {
         uploads.push(
           fetch(sigDataUrl)
             .then(r => r.blob())
