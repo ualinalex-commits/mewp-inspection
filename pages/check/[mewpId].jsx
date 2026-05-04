@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "../../lib/supabase";
 
 const SECTIONS = [
@@ -216,12 +216,17 @@ export default function CheckPage({ mewpId }) {
   const [existingEntry, setExistingEntry] = useState(null);
   const [step, setStep] = useState(0);
   const [operator, setOperator] = useState({ name: "", palCard: "" });
+  const [mewpOwner, setMewpOwner] = useState("");
   const [visual, setVisual] = useState({});
   const [fnChecks, setFnChecks] = useState({});
   const [defects, setDefects] = useState({});
   const [submitError, setSubmitError] = useState("");
   const [alreadyDoneFaults, setAlreadyDoneFaults] = useState([]);
   const [showValidation, setShowValidation] = useState(false);
+  const [photo, setPhoto] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const canvasRef = useRef(null);
+  const sigPadRef = useRef(null);
 
   useEffect(() => {
     if (!mewpId) return;
@@ -243,6 +248,33 @@ export default function CheckPage({ mewpId }) {
     window.scrollTo(0, 0);
   }, [step]);
 
+  // Initialise signature pad when step 3 is shown
+  useEffect(() => {
+    if (step !== 3) return;
+    let raf;
+    raf = requestAnimationFrame(() => {
+      if (!canvasRef.current) return;
+      import("signature_pad").then(({ default: SignaturePad }) => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        // Set pixel dimensions from CSS layout dimensions
+        canvas.width = canvas.offsetWidth || 320;
+        canvas.height = canvas.offsetHeight || 160;
+        sigPadRef.current = new SignaturePad(canvas, {
+          backgroundColor: "rgb(255,255,255)",
+          penColor: "#111827",
+        });
+      });
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      if (sigPadRef.current) {
+        sigPadRef.current.off();
+        sigPadRef.current = null;
+      }
+    };
+  }, [step]);
+
   useEffect(() => {
     if (pageStatus === "already_done" && existingEntry?.daily_status === "fault" && existingEntry?.id) {
       async function loadFaults() {
@@ -261,6 +293,11 @@ export default function CheckPage({ mewpId }) {
     }
   }, [pageStatus]);
 
+  // Clean up photo preview URL when component unmounts
+  useEffect(() => {
+    return () => { if (photoPreview) URL.revokeObjectURL(photoPreview); };
+  }, [photoPreview]);
+
   async function handleSubmit() {
     setPageStatus("submitting");
     let entryId = null;
@@ -270,9 +307,67 @@ export default function CheckPage({ mewpId }) {
       const { data: sheetId, error: sheetErr } = await supabase.rpc("get_or_create_weekly_sheet", { p_mewp_id: mewpId, p_site_id: mewp.sites.id, p_machine_ref: mewp.machine_ref, p_date: today });
       if (sheetErr) throw new Error(`Sheet: ${sheetErr.message}`);
       const hasFaults = Object.values(visual).some(v => v === "fail") || Object.values(fnChecks).some(v => v?.ground === "fail" || v?.platform === "fail");
-      const { data: entryData, error: entryErr } = await supabase.from("daily_inspection_entries").insert({ sheet_id: sheetId, mewp_id: mewpId, site_id: mewp.sites.id, inspection_date: today, day_of_week: dayOfWeek, operator_name: operator.name.trim(), pal_card_number: operator.palCard.trim() || null, initialled: true, daily_status: hasFaults ? "fault" : "ok", submitted_at: new Date().toISOString() }).select("id").single();
+
+      const { data: entryData, error: entryErr } = await supabase.from("daily_inspection_entries").insert({
+        sheet_id: sheetId,
+        mewp_id: mewpId,
+        site_id: mewp.sites.id,
+        inspection_date: today,
+        day_of_week: dayOfWeek,
+        operator_name: operator.name.trim(),
+        pal_card_number: operator.palCard.trim() || null,
+        initialled: true,
+        daily_status: hasFaults ? "fault" : "ok",
+        submitted_at: new Date().toISOString(),
+        mewp_owner: mewpOwner.trim() || null,
+      }).select("id").single();
       if (entryErr) throw new Error(`Entry: ${entryErr.message}`);
       entryId = entryData.id;
+
+      // Upload photo and signature in parallel (non-fatal if they fail)
+      let photoUrl = null;
+      let signatureUrl = null;
+      const siteId = mewp.sites.id;
+
+      const uploads = [];
+
+      if (photo) {
+        uploads.push(
+          supabase.storage.from("mewp-photos")
+            .upload(`${siteId}/${mewpId}/${entryId}.jpg`, photo, { contentType: photo.type, upsert: true })
+            .then(({ error }) => {
+              if (!error) {
+                photoUrl = supabase.storage.from("mewp-photos").getPublicUrl(`${siteId}/${mewpId}/${entryId}.jpg`).data.publicUrl;
+              }
+            })
+            .catch(() => {})
+        );
+      }
+
+      if (sigPadRef.current && !sigPadRef.current.isEmpty()) {
+        const sigDataUrl = sigPadRef.current.toDataURL("image/png");
+        uploads.push(
+          fetch(sigDataUrl)
+            .then(r => r.blob())
+            .then(blob => supabase.storage.from("signatures").upload(`${siteId}/${mewpId}/${entryId}.png`, blob, { contentType: "image/png", upsert: true }))
+            .then(({ error }) => {
+              if (!error) {
+                signatureUrl = supabase.storage.from("signatures").getPublicUrl(`${siteId}/${mewpId}/${entryId}.png`).data.publicUrl;
+              }
+            })
+            .catch(() => {})
+        );
+      }
+
+      await Promise.all(uploads);
+
+      // Update entry with storage URLs (non-fatal)
+      if (photoUrl || signatureUrl) {
+        await supabase.from("daily_inspection_entries")
+          .update({ photo_url: photoUrl, signature_url: signatureUrl })
+          .eq("id", entryId);
+      }
+
       const visualRows = SECTIONS.flatMap(section => section.items.map(item => ({ entry_id: entryId, sheet_id: sheetId, mewp_id: mewpId, inspection_date: today, item_number: item.id, category: section.id, result: visual[item.id] || null })));
       const { error: visualErr } = await supabase.from("visual_check_results").insert(visualRows);
       if (visualErr) throw new Error(`Visual: ${visualErr.message}`);
@@ -422,6 +517,7 @@ export default function CheckPage({ mewpId }) {
           <div style={{ padding: "1rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
             <div><label style={S.label}>Your Full Name *</label><input type="text" placeholder="e.g. James Smith" value={operator.name} onChange={e => setOperator(p => ({ ...p, name: e.target.value }))} style={S.input} /></div>
             <div><label style={S.label}>PAL Card Number</label><input type="text" placeholder="e.g. PAL-123456" value={operator.palCard} onChange={e => setOperator(p => ({ ...p, palCard: e.target.value }))} style={S.input} /></div>
+            <div><label style={S.label}>MEWP Owner (Company)</label><input type="text" placeholder="e.g. ABC Plant Hire Ltd" value={mewpOwner} onChange={e => setMewpOwner(e.target.value)} style={S.input} /></div>
           </div>
         </div>
         <ThoroughExamCard mewp={mewp} />
@@ -478,7 +574,17 @@ export default function CheckPage({ mewpId }) {
           <div style={S.card}>
             <div style={S.cardHead()}><span style={{ fontSize: "1.1rem" }}>📋</span><span style={S.cardHeadText}>Summary</span></div>
             <div style={{ padding: "1rem" }}>
-              {[["Machine", `${mewp?.machine_ref} · ${mewpId?.slice(0, 8)}`], ["Site", mewp?.sites?.name], ["Operator", operator.name], ["PAL Card", operator.palCard || "—"], ["Date", new Date().toLocaleDateString("en-GB")], ["Visual", `${doneVisual}/${totalVisual}`], ["Function", `${doneFn}/${FUNCTION_CHECKS.length}`], ["Faults", faultCount > 0 ? `${faultCount} found` : "None"]].map(([k, v]) => (
+              {[
+                ["Machine", `${mewp?.machine_ref} · ${mewpId?.slice(0, 8)}`],
+                ["Site", mewp?.sites?.name],
+                ["Operator", operator.name],
+                ["PAL Card", operator.palCard || "—"],
+                ["MEWP Owner", mewpOwner || "—"],
+                ["Date", new Date().toLocaleDateString("en-GB")],
+                ["Visual", `${doneVisual}/${totalVisual}`],
+                ["Function", `${doneFn}/${FUNCTION_CHECKS.length}`],
+                ["Faults", faultCount > 0 ? `${faultCount} found` : "None"],
+              ].map(([k, v]) => (
                 <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "0.65rem 0", borderBottom: "1px solid #f3f4f6", fontSize: "0.95rem" }}>
                   <span style={{ color: "#6b7280", fontWeight: 600 }}>{k}</span><span style={{ color: k === "Faults" && faultCount > 0 ? "#dc2626" : "#111827", fontWeight: 700 }}>{v}</span>
                 </div>
@@ -496,6 +602,70 @@ export default function CheckPage({ mewpId }) {
               ))}
             </div>
           )}
+
+          {/* MEWP Photo */}
+          <div style={S.card}>
+            <div style={S.cardHead("#374151")}><span style={{ fontSize: "1.1rem" }}>📷</span><span style={S.cardHeadText}>MEWP Photo (Optional)</span></div>
+            <div style={{ padding: "1rem" }}>
+              {photoPreview && (
+                <img
+                  src={photoPreview}
+                  alt="MEWP"
+                  style={{ width: "100%", maxHeight: "220px", objectFit: "cover", borderRadius: "8px", marginBottom: "0.75rem", display: "block" }}
+                />
+              )}
+              <label style={{ display: "block", width: "100%", background: "#374151", color: "#fff", border: "none", borderRadius: "12px", padding: "0.9rem", fontSize: "0.95rem", fontWeight: 700, cursor: "pointer", fontFamily: "system-ui, sans-serif", textAlign: "center", boxSizing: "border-box" }}>
+                {photoPreview ? "📷 Change Photo" : "📷 Take / Upload Photo"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (photoPreview) URL.revokeObjectURL(photoPreview);
+                    setPhoto(file);
+                    setPhotoPreview(URL.createObjectURL(file));
+                  }}
+                />
+              </label>
+              {photoPreview && (
+                <button
+                  style={{ ...S.ghostBtn, marginTop: "0.6rem", width: "100%", fontSize: "0.85rem" }}
+                  onClick={() => { URL.revokeObjectURL(photoPreview); setPhoto(null); setPhotoPreview(null); }}
+                >
+                  Remove Photo
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Signature pad */}
+          <div style={S.card}>
+            <div style={S.cardHead("#374151")}><span style={{ fontSize: "1.1rem" }}>✍️</span><span style={S.cardHeadText}>Operator Signature (Optional)</span></div>
+            <div style={{ padding: "1rem" }}>
+              <div style={{ fontSize: "0.82rem", color: "#6b7280", marginBottom: "0.6rem" }}>Draw your signature below using your finger or mouse</div>
+              <canvas
+                ref={canvasRef}
+                style={{
+                  width: "100%",
+                  height: "160px",
+                  border: "2px solid #e5e7eb",
+                  borderRadius: "10px",
+                  background: "#fff",
+                  touchAction: "none",
+                  display: "block",
+                }}
+              />
+              <button
+                style={{ ...S.ghostBtn, marginTop: "0.6rem", width: "100%", fontSize: "0.85rem" }}
+                onClick={() => sigPadRef.current?.clear()}
+              >
+                Clear Signature
+              </button>
+            </div>
+          </div>
+
           <div style={{ display: "flex", gap: "0.75rem" }}>
             <button style={S.ghostBtn} onClick={() => setStep(2)}>← Back</button>
             <button style={{ ...S.primaryBtn(faultCount > 0 ? "#b91c1c" : "#15803d"), flex: 1 }} onClick={handleSubmit}>{faultCount > 0 ? "⚠️ Submit with Faults" : "✅ Submit — All Clear"}</button>
