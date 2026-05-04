@@ -343,36 +343,40 @@ export default function CheckPage({ mewpId }) {
       const uploads = [];
 
       if (photoFile) {
-        uploads.push(
-          supabase.storage.from("mewp-photos")
-            .upload(`${siteId}/${mewpId}/${entryId}.jpg`, photoFile, { contentType: photoFile.type, upsert: true })
-            .then(({ error }) => {
-              if (error) {
-                console.error("[upload] photo upload error:", error.message);
-              } else {
-                photoUrl = supabase.storage.from("mewp-photos").getPublicUrl(`${siteId}/${mewpId}/${entryId}.jpg`).data.publicUrl;
-                console.log("[upload] photo uploaded OK:", photoUrl);
-              }
-            })
-            .catch(err => console.error("[upload] photo exception:", err))
-        );
+        uploads.push((async () => {
+          const { data, error } = await supabase.storage
+            .from("mewp-photos")
+            .upload(`${siteId}/${mewpId}/${entryId}.jpg`, photoFile, { contentType: photoFile.type, upsert: true });
+          console.log("[upload] photo result — data:", data, "error:", error);
+          if (error) {
+            console.error("[upload] photo error:", error.message, error);
+          } else {
+            photoUrl = supabase.storage.from("mewp-photos").getPublicUrl(`${siteId}/${mewpId}/${entryId}.jpg`).data.publicUrl;
+            console.log("[upload] photo URL:", photoUrl);
+          }
+        })().catch(err => console.error("[upload] photo exception:", err)));
       }
 
       if (sigDataUrl) {
-        uploads.push(
-          fetch(sigDataUrl)
-            .then(r => r.blob())
-            .then(blob => supabase.storage.from("signatures").upload(`${siteId}/${mewpId}/${entryId}.png`, blob, { contentType: "image/png", upsert: true }))
-            .then(({ error }) => {
-              if (error) {
-                console.error("[upload] signature upload error:", error.message);
-              } else {
-                signatureUrl = supabase.storage.from("signatures").getPublicUrl(`${siteId}/${mewpId}/${entryId}.png`).data.publicUrl;
-                console.log("[upload] signature uploaded OK:", signatureUrl);
-              }
-            })
-            .catch(err => console.error("[upload] signature exception:", err))
-        );
+        uploads.push((async () => {
+          // Convert data URL → Blob without relying on fetch() which can silently fail on data URLs
+          const base64 = sigDataUrl.split(",")[1];
+          const binary = atob(base64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          const blob = new Blob([bytes], { type: "image/png" });
+
+          const { data, error } = await supabase.storage
+            .from("signatures")
+            .upload(`${siteId}/${mewpId}/${entryId}.png`, blob, { contentType: "image/png", upsert: true });
+          console.log("[upload] signature result — data:", data, "error:", error);
+          if (error) {
+            console.error("[upload] signature error:", error.message, error);
+          } else {
+            signatureUrl = supabase.storage.from("signatures").getPublicUrl(`${siteId}/${mewpId}/${entryId}.png`).data.publicUrl;
+            console.log("[upload] signature URL:", signatureUrl);
+          }
+        })().catch(err => console.error("[upload] signature exception:", err)));
       }
 
       await Promise.all(uploads);
