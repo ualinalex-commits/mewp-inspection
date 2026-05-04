@@ -336,11 +336,14 @@ export default function CheckPage({ mewpId }) {
           supabase.storage.from("mewp-photos")
             .upload(`${siteId}/${mewpId}/${entryId}.jpg`, photo, { contentType: photo.type, upsert: true })
             .then(({ error }) => {
-              if (!error) {
+              if (error) {
+                console.error("[upload] photo upload error:", error.message);
+              } else {
                 photoUrl = supabase.storage.from("mewp-photos").getPublicUrl(`${siteId}/${mewpId}/${entryId}.jpg`).data.publicUrl;
+                console.log("[upload] photo uploaded OK:", photoUrl);
               }
             })
-            .catch(() => {})
+            .catch(err => console.error("[upload] photo exception:", err))
         );
       }
 
@@ -351,21 +354,28 @@ export default function CheckPage({ mewpId }) {
             .then(r => r.blob())
             .then(blob => supabase.storage.from("signatures").upload(`${siteId}/${mewpId}/${entryId}.png`, blob, { contentType: "image/png", upsert: true }))
             .then(({ error }) => {
-              if (!error) {
+              if (error) {
+                console.error("[upload] signature upload error:", error.message);
+              } else {
                 signatureUrl = supabase.storage.from("signatures").getPublicUrl(`${siteId}/${mewpId}/${entryId}.png`).data.publicUrl;
+                console.log("[upload] signature uploaded OK:", signatureUrl);
               }
             })
-            .catch(() => {})
+            .catch(err => console.error("[upload] signature exception:", err))
         );
       }
 
       await Promise.all(uploads);
 
-      // Update entry with storage URLs (non-fatal)
-      if (photoUrl || signatureUrl) {
-        await supabase.from("daily_inspection_entries")
-          .update({ photo_url: photoUrl, signature_url: signatureUrl })
+      // Update entry with storage URLs (non-fatal) — only set columns that have a value
+      const urlUpdate = {};
+      if (photoUrl) urlUpdate.photo_url = photoUrl;
+      if (signatureUrl) urlUpdate.signature_url = signatureUrl;
+      if (Object.keys(urlUpdate).length > 0) {
+        const { error: urlErr } = await supabase.from("daily_inspection_entries")
+          .update(urlUpdate)
           .eq("id", entryId);
+        if (urlErr) console.error("[upload] URL update error:", urlErr.message);
       }
 
       const visualRows = SECTIONS.flatMap(section => section.items.map(item => ({ entry_id: entryId, sheet_id: sheetId, mewp_id: mewpId, inspection_date: today, item_number: item.id, category: section.id, result: visual[item.id] || null })));
