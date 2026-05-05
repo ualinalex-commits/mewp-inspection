@@ -319,6 +319,55 @@ export default function CheckPage({ mewpId }) {
       if (sheetErr) throw new Error(`Sheet: ${sheetErr.message}`);
       const hasFaults = Object.values(visual).some(v => v === "fail") || Object.values(fnChecks).some(v => v?.ground === "fail" || v?.platform === "fail");
 
+      // Upload photo and signature before inserting the entry so URLs can be
+      // included in the INSERT directly — avoids needing a subsequent UPDATE
+      // (which requires an RLS UPDATE policy on the anon role).
+      // Path uses today's date; one inspection per MEWP per day ensures uniqueness.
+      let photoUrl = null;
+      let signatureUrl = null;
+      const siteId = mewp.sites.id;
+
+      const uploads = [];
+
+      if (photoFile) {
+        uploads.push((async () => {
+          const { data, error } = await supabase.storage
+            .from("mewp-photos")
+            .upload(`${siteId}/${mewpId}/${today}.jpg`, photoFile, { contentType: photoFile.type, upsert: true });
+          console.log("[upload] photo result — data:", data, "error:", error);
+          if (error) {
+            console.error("[upload] photo error:", error.message, error);
+          } else {
+            photoUrl = supabase.storage.from("mewp-photos").getPublicUrl(`${siteId}/${mewpId}/${today}.jpg`).data.publicUrl;
+            console.log("[upload] photo URL:", photoUrl);
+          }
+        })().catch(err => console.error("[upload] photo exception:", err)));
+      }
+
+      if (sigDataUrl) {
+        uploads.push((async () => {
+          const base64 = sigDataUrl.split(",")[1];
+          const binary = atob(base64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          const blob = new Blob([bytes], { type: "image/png" });
+
+          const { data, error } = await supabase.storage
+            .from("signatures")
+            .upload(`${siteId}/${mewpId}/${today}.png`, blob, { contentType: "image/png", upsert: true });
+          console.log("[upload] signature result — data:", data, "error:", error);
+          if (error) {
+            console.error("[upload] signature error:", error.message, error);
+          } else {
+            signatureUrl = supabase.storage.from("signatures").getPublicUrl(`${siteId}/${mewpId}/${today}.png`).data.publicUrl;
+            console.log("[upload] signature URL:", signatureUrl);
+          }
+        })().catch(err => console.error("[upload] signature exception:", err)));
+      }
+
+      await Promise.all(uploads);
+      console.log("[upload] uploads done — photo_url:", photoUrl, "signature_url:", signatureUrl);
+
       const { data: entryData, error: entryErr } = await supabase.from("daily_inspection_entries").insert({
         sheet_id: sheetId,
         mewp_id: mewpId,
@@ -331,68 +380,12 @@ export default function CheckPage({ mewpId }) {
         daily_status: hasFaults ? "fault" : "ok",
         submitted_at: new Date().toISOString(),
         mewp_owner: mewpOwner.trim() || null,
+        photo_url: photoUrl || null,
+        signature_url: signatureUrl || null,
       }).select("id").single();
       if (entryErr) throw new Error(`Entry: ${entryErr.message}`);
       entryId = entryData.id;
-
-      // Upload photo and signature in parallel (non-fatal if they fail)
-      let photoUrl = null;
-      let signatureUrl = null;
-      const siteId = mewp.sites.id;
-
-      const uploads = [];
-
-      if (photoFile) {
-        uploads.push((async () => {
-          const { data, error } = await supabase.storage
-            .from("mewp-photos")
-            .upload(`${siteId}/${mewpId}/${entryId}.jpg`, photoFile, { contentType: photoFile.type, upsert: true });
-          console.log("[upload] photo result — data:", data, "error:", error);
-          if (error) {
-            console.error("[upload] photo error:", error.message, error);
-          } else {
-            photoUrl = supabase.storage.from("mewp-photos").getPublicUrl(`${siteId}/${mewpId}/${entryId}.jpg`).data.publicUrl;
-            console.log("[upload] photo URL:", photoUrl);
-          }
-        })().catch(err => console.error("[upload] photo exception:", err)));
-      }
-
-      if (sigDataUrl) {
-        uploads.push((async () => {
-          // Convert data URL → Blob without relying on fetch() which can silently fail on data URLs
-          const base64 = sigDataUrl.split(",")[1];
-          const binary = atob(base64);
-          const bytes = new Uint8Array(binary.length);
-          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-          const blob = new Blob([bytes], { type: "image/png" });
-
-          const { data, error } = await supabase.storage
-            .from("signatures")
-            .upload(`${siteId}/${mewpId}/${entryId}.png`, blob, { contentType: "image/png", upsert: true });
-          console.log("[upload] signature result — data:", data, "error:", error);
-          if (error) {
-            console.error("[upload] signature error:", error.message, error);
-          } else {
-            signatureUrl = supabase.storage.from("signatures").getPublicUrl(`${siteId}/${mewpId}/${entryId}.png`).data.publicUrl;
-            console.log("[upload] signature URL:", signatureUrl);
-          }
-        })().catch(err => console.error("[upload] signature exception:", err)));
-      }
-
-      await Promise.all(uploads);
-
-      // Update entry with storage URLs (non-fatal) — only set columns that have a value
-      const urlUpdate = {};
-      if (photoUrl) urlUpdate.photo_url = photoUrl;
-      if (signatureUrl) urlUpdate.signature_url = signatureUrl;
-      console.log("[upload] saving URLs to DB, entry_id:", entryId, "photo_url:", photoUrl, "signature_url:", signatureUrl);
-      if (Object.keys(urlUpdate).length > 0) {
-        const { data: urlData, error: urlErr } = await supabase.from("daily_inspection_entries")
-          .update(urlUpdate)
-          .eq("id", entryId)
-          .select();
-        console.log("[upload] URL update result — data:", urlData, "error:", urlErr);
-      }
+      console.log("[insert] entry inserted, id:", entryId);
 
       const visualRows = SECTIONS.flatMap(section => section.items.map(item => ({ entry_id: entryId, sheet_id: sheetId, mewp_id: mewpId, inspection_date: today, item_number: item.id, category: section.id, result: visual[item.id] || null })));
       const { error: visualErr } = await supabase.from("visual_check_results").insert(visualRows);
