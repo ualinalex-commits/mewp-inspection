@@ -385,11 +385,13 @@ export default function CheckPage({ mewpId }) {
       const urlUpdate = {};
       if (photoUrl) urlUpdate.photo_url = photoUrl;
       if (signatureUrl) urlUpdate.signature_url = signatureUrl;
+      console.log("[upload] saving URLs to DB, entry_id:", entryId, "photo_url:", photoUrl, "signature_url:", signatureUrl);
       if (Object.keys(urlUpdate).length > 0) {
-        const { error: urlErr } = await supabase.from("daily_inspection_entries")
+        const { data: urlData, error: urlErr } = await supabase.from("daily_inspection_entries")
           .update(urlUpdate)
-          .eq("id", entryId);
-        if (urlErr) console.error("[upload] URL update error:", urlErr.message);
+          .eq("id", entryId)
+          .select();
+        console.log("[upload] URL update result — data:", urlData, "error:", urlErr);
       }
 
       const visualRows = SECTIONS.flatMap(section => section.items.map(item => ({ entry_id: entryId, sheet_id: sheetId, mewp_id: mewpId, inspection_date: today, item_number: item.id, category: section.id, result: visual[item.id] || null })));
