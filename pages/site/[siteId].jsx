@@ -523,6 +523,7 @@ function ArchivedMEWPCard({ mewp, onRestore, isAdmin }) {
 export default function SiteDashboard({ siteId }) {
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isMainAdmin, setIsMainAdmin] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [site, setSite] = useState(null);
@@ -552,6 +553,9 @@ export default function SiteDashboard({ siteId }) {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setAuthChecked(true); return; }
     const { data: profile } = await supabase.from("user_profiles").select("role, site_id").eq("id", session.user.id).single();
+    if (profile && profile.role === "main_admin") {
+      setIsMainAdmin(true);
+    }
     if (profile && (profile.role === "main_admin" || (profile.role === "site_admin" && profile.site_id === siteId))) {
       setIsAdmin(true);
     }
@@ -785,6 +789,19 @@ export default function SiteDashboard({ siteId }) {
           )}
         </div>
       </div>
+
+      {isMainAdmin && (
+        <div style={{ background: "#fff", borderBottom: "1px solid #f3f4f6" }}>
+          <div style={{ maxWidth: "640px", margin: "0 auto", padding: "0.5rem 1rem" }}>
+            <button
+              onClick={() => router.push("/admin")}
+              style={{ background: "none", border: "none", color: "#d02a35", fontSize: "0.85rem", fontWeight: 700, cursor: "pointer", padding: 0, fontFamily: "system-ui, sans-serif" }}
+            >
+              ← Back to Sites
+            </button>
+          </div>
+        </div>
+      )}
 
       <div style={S.container}>
         {/* Stats */}
