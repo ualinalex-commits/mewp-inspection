@@ -311,7 +311,7 @@ function MEWPCard({ mewp, todayInspection, initialPdfUrl, initialPdfGeneratedAt,
       {/* Collapsed header */}
       <div style={{ minHeight: "64px", padding: "0 1rem", display: "flex", alignItems: "center", gap: "0.75rem", background: isExpanded ? "#f8faff" : "#fff", transition: "background 0.2s" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: "1.05rem", fontWeight: 900, color: "#111827" }}>{mewp.machine_ref}{mewp.serial_number ? ` - ${mewp.serial_number}` : ""}<span style={{ fontSize: "0.65rem", color: "#9ca3af", fontFamily: "monospace", fontWeight: 600, marginLeft: "0.4rem" }}>{mewp.id.slice(0, 8)}</span></div>
+          <div style={{ fontSize: "1.05rem", fontWeight: 900, color: "#111827" }}>{mewp.machine_ref}{mewp.serial_number ? ` - ${mewp.serial_number}` : ""}</div>
           {mewp.model && (
             <div style={{ fontSize: "0.78rem", color: "#9ca3af", marginTop: "0.1rem" }}>{mewp.model}</div>
           )}
@@ -478,7 +478,7 @@ function ArchivedMEWPCard({ mewp, onRestore, isAdmin }) {
       {/* Header */}
       <div style={{ minHeight: "60px", padding: "0 1rem", display: "flex", alignItems: "center", gap: "0.75rem", background: expanded ? "#fafafa" : "#fff" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: "1rem", fontWeight: 900, color: "#6b7280" }}>{mewp.machine_ref}{mewp.serial_number ? ` - ${mewp.serial_number}` : ""}<span style={{ fontSize: "0.65rem", color: "#9ca3af", fontFamily: "monospace", fontWeight: 600, marginLeft: "0.4rem" }}>{mewp.id.slice(0, 8)}</span></div>
+          <div style={{ fontSize: "1rem", fontWeight: 900, color: "#6b7280" }}>{mewp.machine_ref}{mewp.serial_number ? ` - ${mewp.serial_number}` : ""}</div>
           {mewp.model && (
             <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: "0.1rem" }}>{mewp.model}</div>
           )}

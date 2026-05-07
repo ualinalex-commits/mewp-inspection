@@ -398,9 +398,9 @@ export default function CheckPage({ mewpId }) {
       FUNCTION_CHECKS.forEach(item => { const v = fnChecks[item.id]; if (v?.ground === "fail" || v?.platform === "fail") { const which = v?.ground === "fail" && v?.platform === "fail" ? "Ground and Platform" : v?.ground === "fail" ? "Ground" : "Platform"; defectRows.push({ entry_id: entryId, sheet_id: sheetId, mewp_id: mewpId, site_id: mewp.sites.id, inspection_date: today, item_number: item.id, check_type: "function", defect_details: defects[item.id] || `Fault on ${which} control`, date_noted: today, status: "open" }); }});
       if (defectRows.length > 0) { const { error: defectErr } = await supabase.from("defect_log").insert(defectRows); if (defectErr) throw new Error(`Defects: ${defectErr.message}`); }
 
-      // Trigger PDF generation in the background — fire and don't block the done screen
+      // Trigger PDF generation and wait for it before showing the done screen
       console.log("[inspection] submission saved, triggering PDF for mewp_id:", mewpId, "sheet_id:", sheetId);
-      fetch("/api/trigger-pdf", {
+      await fetch("/api/trigger-pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mewp_id: mewpId, sheet_id: sheetId }),
@@ -452,7 +452,15 @@ export default function CheckPage({ mewpId }) {
 
   if (pageStatus === "loading") return <div style={{ ...S.app, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ textAlign: "center" }}><div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>⏳</div><div style={{ color: "#6b7280" }}>Loading...</div></div></div>;
   if (pageStatus === "not_found") return <div style={{ ...S.app, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ textAlign: "center", padding: "2rem" }}><div style={{ fontSize: "3rem", marginBottom: "1rem" }}>⚠️</div><div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#dc2626", marginBottom: "0.5rem" }}>Machine Not Found</div><div style={{ color: "#6b7280" }}>Contact your site manager.</div></div></div>;
-  if (pageStatus === "submitting") return <div style={{ ...S.app, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ textAlign: "center" }}><div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>💾</div><div style={{ color: "#6b7280", fontWeight: 700 }}>Saving inspection...</div></div></div>;
+  if (pageStatus === "submitting") return (
+    <div style={{ ...S.app, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <style>{`@keyframes _spin { to { transform: rotate(360deg); } }`}</style>
+      <div style={{ textAlign: "center" }}>
+        <div style={{ width: "52px", height: "52px", border: "5px solid #e5e7eb", borderTopColor: "#d02a35", borderRadius: "50%", animation: "_spin 0.75s linear infinite", margin: "0 auto 1.25rem" }} />
+        <div style={{ color: "#374151", fontWeight: 700, fontSize: "1rem" }}>Submitting inspection...</div>
+      </div>
+    </div>
+  );
   if (pageStatus === "submit_error") return <div style={{ ...S.app, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ textAlign: "center", padding: "2rem" }}><div style={{ fontSize: "3rem", marginBottom: "1rem" }}>❌</div><div style={{ fontSize: "1rem", fontWeight: 800, color: "#dc2626", marginBottom: "0.5rem" }}>Submission Failed</div><div style={{ color: "#6b7280", marginBottom: "1.5rem" }}>{submitError}</div><button style={S.primaryBtn()} onClick={() => setPageStatus("form")}>Try Again</button></div></div>;
 
   if (pageStatus === "already_done") return (
