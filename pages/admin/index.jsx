@@ -5,14 +5,14 @@ import { supabase } from "../../lib/supabase";
 const S = {
   app: { minHeight: "100vh", background: "#f3f4f6", fontFamily: "system-ui, -apple-system, sans-serif", color: "#111827", paddingBottom: "4rem" },
   logoBar: { background: "#fff", padding: "0.25rem 1rem", display: "flex", alignItems: "center", justifyContent: "center" },
-  infoBar: { background: "#1d4ed8", padding: "0.75rem 1.25rem", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" },
+  infoBar: { background: "#d02a35", padding: "0.75rem 1.25rem", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" },
   container: { maxWidth: "640px", margin: "0 auto", padding: "1rem" },
   card: { background: "#fff", borderRadius: "12px", overflow: "hidden", marginBottom: "1rem", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" },
-  cardHead: (color = "#1d4ed8") => ({ background: color, padding: "0.75rem 1rem", display: "flex", alignItems: "center", gap: "0.6rem" }),
+  cardHead: (color = "#d02a35") => ({ background: color, padding: "0.75rem 1rem", display: "flex", alignItems: "center", gap: "0.6rem" }),
   cardHeadText: { fontSize: "0.8rem", fontWeight: 800, color: "#fff", letterSpacing: "0.04em", textTransform: "uppercase" },
   input: { width: "100%", background: "#f9fafb", border: "2px solid #e5e7eb", borderRadius: "10px", color: "#111827", padding: "0.85rem 1rem", fontSize: "1rem", fontFamily: "system-ui, sans-serif", outline: "none", boxSizing: "border-box" },
   label: { fontSize: "0.75rem", fontWeight: 700, color: "#374151", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: "0.4rem", display: "block" },
-  primaryBtn: (color = "#1d4ed8") => ({ width: "100%", background: color, color: "#fff", border: "none", borderRadius: "12px", padding: "1rem", fontSize: "1rem", fontWeight: 800, cursor: "pointer", fontFamily: "system-ui, sans-serif" }),
+  primaryBtn: (color = "#d02a35") => ({ width: "100%", background: color, color: "#fff", border: "none", borderRadius: "12px", padding: "1rem", fontSize: "1rem", fontWeight: 800, cursor: "pointer", fontFamily: "system-ui, sans-serif" }),
   ghostBtn: (color = "#374151") => ({ background: "#fff", color, border: `2px solid ${color}33`, borderRadius: "10px", padding: "0.65rem 1rem", fontSize: "0.82rem", fontWeight: 700, cursor: "pointer", fontFamily: "system-ui, sans-serif", whiteSpace: "nowrap" }),
   error: { background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "8px", padding: "0.75rem", fontSize: "0.85rem", color: "#b91c1c" },
   pill: (color) => ({ background: `${color}15`, border: `2px solid ${color}30`, color, fontSize: "0.68rem", fontWeight: 800, padding: "0.2rem 0.6rem", borderRadius: "20px", textTransform: "uppercase", whiteSpace: "nowrap" }),
@@ -246,7 +246,7 @@ export default function AdminDashboard() {
       <div style={S.infoBar}>
         <div>
           <div style={{ fontSize: "1rem", fontWeight: 800, color: "#fff" }}>Admin Dashboard</div>
-          <div style={{ fontSize: "0.72rem", color: "#bfdbfe" }}>Main Administrator</div>
+          <div style={{ fontSize: "0.72rem", color: "#fecdd3" }}>Main Administrator</div>
         </div>
         <button
           style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: "8px", color: "#fff", padding: "0.5rem 0.75rem", cursor: "pointer", fontSize: "0.8rem", fontWeight: 700 }}
@@ -259,7 +259,7 @@ export default function AdminDashboard() {
       <div style={S.container}>
         {/* Stats */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", margin: "1rem 0" }}>
-          {[["Sites", sites.length, "#1d4ed8"], ["Site Admins", siteAdmins.length, "#15803d"]].map(([label, value, color]) => (
+          {[["Sites", sites.length, "#d02a35"], ["Site Admins", siteAdmins.length, "#15803d"]].map(([label, value, color]) => (
             <div key={label} style={{ background: "#fff", borderRadius: "12px", padding: "1rem", textAlign: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
               <div style={{ fontSize: "2rem", fontWeight: 900, color, lineHeight: 1 }}>{loading ? "—" : value}</div>
               <div style={{ fontSize: "0.7rem", color: "#6b7280", marginTop: "0.3rem", fontWeight: 700, textTransform: "uppercase" }}>{label}</div>
@@ -273,7 +273,7 @@ export default function AdminDashboard() {
             <span style={{ fontSize: "1.1rem" }}>📍</span>
             <span style={S.cardHeadText}>Sites</span>
             <button
-              style={{ marginLeft: "auto", background: "#fff", color: "#1d4ed8", border: "none", borderRadius: "8px", padding: "0.4rem 0.85rem", fontSize: "0.8rem", fontWeight: 800, cursor: "pointer" }}
+              style={{ marginLeft: "auto", background: "#fff", color: "#d02a35", border: "none", borderRadius: "8px", padding: "0.4rem 0.85rem", fontSize: "0.8rem", fontWeight: 800, cursor: "pointer" }}
               onClick={() => setShowAddSite(true)}
             >
               + Add Site
@@ -306,7 +306,7 @@ export default function AdminDashboard() {
                 href={`/site/${site.id}`}
                 target="_blank"
                 rel="noreferrer"
-                style={{ background: "#1d4ed8", color: "#fff", borderRadius: "8px", padding: "0.4rem 0.85rem", fontSize: "0.78rem", fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap", flexShrink: 0 }}
+                style={{ background: "#d02a35", color: "#fff", borderRadius: "8px", padding: "0.4rem 0.85rem", fontSize: "0.78rem", fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap", flexShrink: 0 }}
               >
                 View Dashboard
               </a>

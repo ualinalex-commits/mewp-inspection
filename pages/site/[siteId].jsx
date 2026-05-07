@@ -54,17 +54,17 @@ function isExamExpired(expiry) {
 const S = {
   app: { minHeight: "100vh", background: "#f3f4f6", fontFamily: "system-ui, -apple-system, sans-serif", color: "#111827", paddingBottom: "4rem" },
   logoBar: { background: "#fff", padding: "0.25rem 1rem", display: "flex", alignItems: "center", justifyContent: "center" },
-  infoBar: { background: "#1d4ed8", padding: "0.75rem 1.25rem", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" },
+  infoBar: { background: "#d02a35", padding: "0.75rem 1.25rem", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" },
   container: { maxWidth: "640px", margin: "0 auto", padding: "1rem" },
   card: { background: "#fff", borderRadius: "12px", overflow: "hidden", marginBottom: "1rem", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" },
-  cardHead: (color = "#1d4ed8") => ({ background: color, padding: "0.75rem 1rem", display: "flex", alignItems: "center", gap: "0.6rem" }),
+  cardHead: (color = "#d02a35") => ({ background: color, padding: "0.75rem 1rem", display: "flex", alignItems: "center", gap: "0.6rem" }),
   cardHeadText: { fontSize: "0.8rem", fontWeight: 800, color: "#fff", letterSpacing: "0.04em", textTransform: "uppercase" },
   input: { width: "100%", background: "#f9fafb", border: "2px solid #e5e7eb", borderRadius: "10px", color: "#111827", padding: "0.85rem 1rem", fontSize: "1rem", fontFamily: "system-ui, sans-serif", outline: "none", boxSizing: "border-box" },
   label: { fontSize: "0.75rem", fontWeight: 700, color: "#374151", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: "0.4rem", display: "block" },
-  primaryBtn: (color = "#1d4ed8") => ({ width: "100%", background: color, color: "#fff", border: "none", borderRadius: "12px", padding: "1rem", fontSize: "1rem", fontWeight: 800, cursor: "pointer", fontFamily: "system-ui, sans-serif", boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }),
+  primaryBtn: (color = "#d02a35") => ({ width: "100%", background: color, color: "#fff", border: "none", borderRadius: "12px", padding: "1rem", fontSize: "1rem", fontWeight: 800, cursor: "pointer", fontFamily: "system-ui, sans-serif", boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }),
   ghostBtn: (color = "#374151") => ({ background: "#fff", color, border: `2px solid ${color}33`, borderRadius: "10px", padding: "0.65rem 1rem", fontSize: "0.82rem", fontWeight: 700, cursor: "pointer", fontFamily: "system-ui, sans-serif", whiteSpace: "nowrap" }),
   statPill: (color) => ({ background: `${color}15`, border: `2px solid ${color}30`, color, fontSize: "0.72rem", fontWeight: 800, padding: "0.3rem 0.75rem", borderRadius: "20px", textTransform: "uppercase" }),
-  detailsBtn: { background: "#fff", color: "#1d4ed8", border: "2px solid #1d4ed8", borderRadius: "8px", padding: "0.35rem 0.85rem", fontSize: "0.78rem", fontWeight: 700, cursor: "pointer", fontFamily: "system-ui, sans-serif", whiteSpace: "nowrap", flexShrink: 0 },
+  detailsBtn: { background: "#fff", color: "#d02a35", border: "2px solid #d02a35", borderRadius: "8px", padding: "0.35rem 0.85rem", fontSize: "0.78rem", fontWeight: 700, cursor: "pointer", fontFamily: "system-ui, sans-serif", whiteSpace: "nowrap", flexShrink: 0 },
 };
 
 function QRCanvas({ url, size = 160 }) {
@@ -144,7 +144,7 @@ function WeeklyTracker({ mewpId, refreshKey }) {
           return (
             <div key={date} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.2rem", flex: 1 }}>
               <div style={{ width: "100%", aspectRatio: "1", maxWidth: "40px", borderRadius: "6px", background: bg, border, boxSizing: "border-box" }} />
-              <div style={{ fontSize: "0.58rem", color: isToday ? "#1d4ed8" : "#9ca3af", fontWeight: isToday ? 900 : 700, textTransform: "uppercase" }}>{WEEK_DAYS[i]}</div>
+              <div style={{ fontSize: "0.58rem", color: isToday ? "#d02a35" : "#9ca3af", fontWeight: isToday ? 900 : 700, textTransform: "uppercase" }}>{WEEK_DAYS[i]}</div>
             </div>
           );
         })}
@@ -422,9 +422,9 @@ function MEWPCard({ mewp, todayInspection, initialPdfUrl, initialPdfGeneratedAt,
 
           {/* QR Code action buttons */}
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-            <button style={S.ghostBtn("#1d4ed8")} onClick={() => setShowNFC(!showNFC)}>{showNFC ? "Hide QR Code" : "QR Code"}</button>
+            <button style={S.ghostBtn("#d02a35")} onClick={() => setShowNFC(!showNFC)}>{showNFC ? "Hide QR Code" : "QR Code"}</button>
             <button style={S.ghostBtn()} onClick={copyNFC}>Copy URL</button>
-            <a href={nfcUrl} target="_blank" rel="noreferrer" style={{ ...S.ghostBtn("#1d4ed8"), textDecoration: "none" }}>Open Form</a>
+            <a href={nfcUrl} target="_blank" rel="noreferrer" style={{ ...S.ghostBtn("#d02a35"), textDecoration: "none" }}>Open Form</a>
           </div>
 
           {/* QR Code panel */}
@@ -446,7 +446,7 @@ function MEWPCard({ mewp, todayInspection, initialPdfUrl, initialPdfGeneratedAt,
                   onClick={archiving ? undefined : handleArchive}
                   role="switch"
                   aria-checked="true"
-                  style={{ width: "44px", height: "24px", background: "#1d4ed8", borderRadius: "12px", cursor: archiving ? "not-allowed" : "pointer", position: "relative", flexShrink: 0, opacity: archiving ? 0.5 : 1, transition: "opacity 0.2s" }}
+                  style={{ width: "44px", height: "24px", background: "#d02a35", borderRadius: "12px", cursor: archiving ? "not-allowed" : "pointer", position: "relative", flexShrink: 0, opacity: archiving ? 0.5 : 1, transition: "opacity 0.2s" }}
                 >
                   <span style={{ position: "absolute", top: "3px", left: "3px", width: "18px", height: "18px", background: "#fff", borderRadius: "50%", boxShadow: "0 1px 3px rgba(0,0,0,0.2)", display: "block" }} />
                 </div>
@@ -773,7 +773,7 @@ export default function SiteDashboard({ siteId }) {
           {(site.location || site.postcode) && (
             <div style={{ fontSize: "0.8rem", color: "#93c5fd" }}>{[site.location, site.postcode].filter(Boolean).join(", ")}</div>
           )}
-          <div style={{ fontSize: "0.72rem", color: "#bfdbfe" }}>Site Manager Dashboard</div>
+          <div style={{ fontSize: "0.72rem", color: "#fecdd3" }}>Site Manager Dashboard</div>
         </div>
         <div style={{ display: "flex", gap: "0.5rem" }}>
           <button style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: "8px", color: "#fff", padding: "0.5rem 0.75rem", cursor: "pointer", fontSize: "0.8rem", fontWeight: 700 }} onClick={loadData}>↻</button>
@@ -789,7 +789,7 @@ export default function SiteDashboard({ siteId }) {
       <div style={S.container}>
         {/* Stats */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.75rem", margin: "1rem 0" }}>
-          {[["Total", stats.total, "#1d4ed8"], ["Done", stats.doneToday, "#15803d"], ["Faults", stats.faultsToday, stats.faultsToday > 0 ? "#b91c1c" : "#9ca3af"]].map(([label, value, color]) => (
+          {[["Total", stats.total, "#d02a35"], ["Done", stats.doneToday, "#15803d"], ["Faults", stats.faultsToday, stats.faultsToday > 0 ? "#b91c1c" : "#9ca3af"]].map(([label, value, color]) => (
             <div key={label} style={{ background: "#fff", borderRadius: "12px", padding: "1rem", textAlign: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
               <div style={{ fontSize: "2rem", fontWeight: 900, color, lineHeight: 1 }}>{value}</div>
               <div style={{ fontSize: "0.7rem", color: "#6b7280", marginTop: "0.3rem", fontWeight: 700, textTransform: "uppercase" }}>{label}</div>
@@ -802,10 +802,10 @@ export default function SiteDashboard({ siteId }) {
           <div style={{ background: "#fff", borderRadius: "12px", padding: "1rem", marginBottom: "1rem", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.82rem", fontWeight: 700, color: "#374151", marginBottom: "0.6rem" }}>
               <span>Today's Inspection Progress</span>
-              <span style={{ color: allDone ? "#15803d" : "#1d4ed8" }}>{Math.round((stats.doneToday / stats.total) * 100)}%</span>
+              <span style={{ color: allDone ? "#15803d" : "#d02a35" }}>{Math.round((stats.doneToday / stats.total) * 100)}%</span>
             </div>
             <div style={{ height: "10px", background: "#e5e7eb", borderRadius: "5px", overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${(stats.doneToday / stats.total) * 100}%`, background: allDone ? "#15803d" : "#1d4ed8", transition: "width 0.4s", borderRadius: "5px" }} />
+              <div style={{ height: "100%", width: `${(stats.doneToday / stats.total) * 100}%`, background: allDone ? "#15803d" : "#d02a35", transition: "width 0.4s", borderRadius: "5px" }} />
             </div>
             {pendingCount > 0 && <div style={{ fontSize: "0.8rem", color: "#6b7280", marginTop: "0.5rem" }}>{pendingCount} MEWP{pendingCount > 1 ? "s" : ""} still pending today</div>}
             {allDone && <div style={{ fontSize: "0.8rem", color: "#15803d", marginTop: "0.5rem", fontWeight: 700 }}>All MEWPs inspected today!</div>}
@@ -833,7 +833,7 @@ export default function SiteDashboard({ siteId }) {
           <div style={S.cardHead()}>
             <span style={{ fontSize: "1.1rem" }}>🏗️</span>
             <span style={S.cardHeadText}>MEWPs on Site</span>
-            {isAdmin && <button style={{ marginLeft: "auto", background: "#fff", color: "#1d4ed8", border: "none", borderRadius: "8px", padding: "0.4rem 0.85rem", fontSize: "0.8rem", fontWeight: 800, cursor: "pointer" }} onClick={() => setShowAddModal(true)}>+ Add</button>}
+            {isAdmin && <button style={{ marginLeft: "auto", background: "#fff", color: "#d02a35", border: "none", borderRadius: "8px", padding: "0.4rem 0.85rem", fontSize: "0.8rem", fontWeight: 800, cursor: "pointer" }} onClick={() => setShowAddModal(true)}>+ Add</button>}
           </div>
           {mewps.length === 0 && (
             <div style={{ padding: "2.5rem", textAlign: "center" }}>
@@ -848,7 +848,7 @@ export default function SiteDashboard({ siteId }) {
         {mewps.map(mewp => {
           const expanded = expandedMewpId === mewp.id;
           return (
-            <div key={mewp.id} style={{ background: "#fff", borderRadius: "12px", overflow: "hidden", marginBottom: "0.5rem", border: expanded ? "3px solid #1d4ed8" : "1px solid #f3f4f6", boxShadow: expanded ? "0 0 0 3px rgba(29,78,216,0.15), 0 2px 8px rgba(0,0,0,0.1)" : "0 1px 3px rgba(0,0,0,0.08)", transition: "border 0.2s, box-shadow 0.2s" }}>
+            <div key={mewp.id} style={{ background: "#fff", borderRadius: "12px", overflow: "hidden", marginBottom: "0.5rem", border: expanded ? "3px solid #d02a35" : "1px solid #f3f4f6", boxShadow: expanded ? "0 0 0 3px rgba(208,42,53,0.15), 0 2px 8px rgba(0,0,0,0.1)" : "0 1px 3px rgba(0,0,0,0.08)", transition: "border 0.2s, box-shadow 0.2s" }}>
               <MEWPCard
                 mewp={mewp}
                 todayInspection={todayInspections[mewp.id] || null}
@@ -896,7 +896,7 @@ export default function SiteDashboard({ siteId }) {
 
         {/* Setup instructions */}
         <div style={{ background: "#fff", borderRadius: "12px", padding: "1.25rem", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
-          <div style={{ fontSize: "0.8rem", fontWeight: 800, color: "#1d4ed8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "1rem" }}>Setup Instructions</div>
+          <div style={{ fontSize: "0.8rem", fontWeight: 800, color: "#d02a35", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "1rem" }}>Setup Instructions</div>
           {[["1️⃣", "Add each MEWP using the \"+ Add\" button above"], ["2️⃣", "Open the MEWP detail and tap \"QR Code\" to generate a unique QR code"], ["3️⃣", "Print the QR code and attach it to the physical MEWP"], ["4️⃣", "Workers scan the QR code each morning before operating"], ["5️⃣", "Complete the daily pre-use inspection on their device"], ["6️⃣", "Weekly PDF auto-generates every Sunday at 8PM and is saved in View Reports"]].map(([n, text]) => (
             <div key={n} style={{ display: "flex", gap: "0.75rem", marginBottom: "0.65rem", alignItems: "flex-start" }}>
               <span style={{ fontSize: "1.1rem", minWidth: "1.5rem" }}>{n}</span>

@@ -195,16 +195,16 @@ function FunctionRow({ item, value, onChange, showError }) {
 
 const S = {
   app: { minHeight: "100vh", background: "#f3f4f6", fontFamily: "system-ui, -apple-system, sans-serif", color: "#111827", paddingBottom: "5rem" },
-  topbar: { background: "#1d4ed8", padding: "1rem 1.25rem", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" },
+  topbar: { background: "#d02a35", padding: "1rem 1.25rem", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" },
   topbarTitle: { fontSize: "0.85rem", fontWeight: 800, color: "#fff" },
   topbarSub: { fontSize: "0.7rem", color: "#93c5fd" },
   container: { maxWidth: "600px", margin: "0 auto", padding: "1rem" },
   card: { background: "#fff", borderRadius: "12px", overflow: "hidden", marginBottom: "1rem", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" },
-  cardHead: (color="#1d4ed8") => ({ background: color, padding: "0.75rem 1rem", display: "flex", alignItems: "center", gap: "0.6rem" }),
+  cardHead: (color="#d02a35") => ({ background: color, padding: "0.75rem 1rem", display: "flex", alignItems: "center", gap: "0.6rem" }),
   cardHeadText: { fontSize: "0.8rem", fontWeight: 800, color: "#fff", letterSpacing: "0.04em", textTransform: "uppercase" },
   input: { width: "100%", background: "#f9fafb", border: "2px solid #e5e7eb", borderRadius: "10px", color: "#111827", padding: "0.85rem 1rem", fontSize: "1rem", fontFamily: "system-ui, sans-serif", outline: "none", boxSizing: "border-box" },
   label: { fontSize: "0.75rem", fontWeight: 700, color: "#374151", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: "0.4rem", display: "block" },
-  primaryBtn: (color="#1d4ed8", disabled=false) => ({ width: "100%", background: disabled?"#9ca3af":color, color: "#fff", border: "none", borderRadius: "12px", padding: "1rem", fontSize: "1rem", fontWeight: 800, cursor: disabled?"not-allowed":"pointer", fontFamily: "system-ui, sans-serif", boxShadow: disabled?"none":"0 4px 12px rgba(0,0,0,0.15)" }),
+  primaryBtn: (color="#d02a35", disabled=false) => ({ width: "100%", background: disabled?"#9ca3af":color, color: "#fff", border: "none", borderRadius: "12px", padding: "1rem", fontSize: "1rem", fontWeight: 800, cursor: disabled?"not-allowed":"pointer", fontFamily: "system-ui, sans-serif", boxShadow: disabled?"none":"0 4px 12px rgba(0,0,0,0.15)" }),
   ghostBtn: { background: "#fff", color: "#374151", border: "2px solid #e5e7eb", borderRadius: "12px", padding: "0.85rem 1.5rem", fontSize: "0.9rem", fontWeight: 700, cursor: "pointer", fontFamily: "system-ui, sans-serif" },
   progressWrap: { height: "8px", background: "#e5e7eb", borderRadius: "4px", marginBottom: "1.25rem", overflow: "hidden" },
   warningBox: (bg="#fef2f2", border="#fecaca", text="#991b1b") => ({ background: bg, border: `1px solid ${border}`, borderRadius: "10px", padding: "0.85rem 1rem", fontSize: "0.88rem", color: text, marginBottom: "1rem", lineHeight: 1.6 }),
@@ -530,7 +530,7 @@ export default function CheckPage({ mewpId }) {
     <div style={S.app}>
       <div style={S.topbar}><div><div style={S.topbarTitle}>{mewp?.machine_ref} <span style={{ fontFamily: "monospace", fontSize: "0.7rem", opacity: 0.8 }}>{mewpId?.slice(0, 8)}</span></div><div style={S.topbarSub}>{mewp?.sites?.name}{mewp?.model ? ` · ${mewp.model}` : ""}</div></div></div>
       <div style={S.container}>
-        <div style={{ padding: "1rem 0 0.5rem" }}><div style={{ fontSize: "0.7rem", color: "#1d4ed8", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.3rem" }}>Daily Pre-Use Inspection</div><div style={{ fontSize: "1.2rem", fontWeight: 900, color: "#111827" }}>{todayLong}</div></div>
+        <div style={{ padding: "1rem 0 0.5rem" }}><div style={{ fontSize: "0.7rem", color: "#d02a35", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.3rem" }}>Daily Pre-Use Inspection</div><div style={{ fontSize: "1.2rem", fontWeight: 900, color: "#111827" }}>{todayLong}</div></div>
         <div style={S.card}>
           <div style={S.cardHead()}><span style={{ fontSize: "1.1rem" }}>👷</span><span style={S.cardHeadText}>Operator Details</span></div>
           <div style={{ padding: "1rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
@@ -541,16 +541,16 @@ export default function CheckPage({ mewpId }) {
         </div>
         <ThoroughExamCard mewp={mewp} />
         <div style={S.warningBox("#fffbeb", "#fde68a", "#92400e")}>⚡ Only trained and authorised persons should operate this equipment. All faults must be reported to your supervisor immediately.</div>
-        <button style={S.primaryBtn("#1d4ed8", !operator.name.trim())} onClick={() => operator.name.trim() && setStep(1)}>Start Visual Checks →</button>
+        <button style={S.primaryBtn("#d02a35", !operator.name.trim())} onClick={() => operator.name.trim() && setStep(1)}>Start Visual Checks →</button>
       </div>
     </div>
   );
 
   if (step === 1) return (
     <div style={S.app}>
-      <div style={S.topbar}><div><div style={S.topbarTitle}>Visual Checks</div><div style={S.topbarSub}>{doneVisual}/{totalVisual} completed · {mewp?.machine_ref} · <span style={{ fontFamily: "monospace" }}>{mewpId?.slice(0, 8)}</span></div></div><span style={{ background: "#fff", color: "#1d4ed8", fontSize: "0.75rem", fontWeight: 800, padding: "0.25rem 0.6rem", borderRadius: "20px" }}>{progress}%</span></div>
+      <div style={S.topbar}><div><div style={S.topbarTitle}>Visual Checks</div><div style={S.topbarSub}>{doneVisual}/{totalVisual} completed · {mewp?.machine_ref} · <span style={{ fontFamily: "monospace" }}>{mewpId?.slice(0, 8)}</span></div></div><span style={{ background: "#fff", color: "#d02a35", fontSize: "0.75rem", fontWeight: 800, padding: "0.25rem 0.6rem", borderRadius: "20px" }}>{progress}%</span></div>
       <div style={S.container}>
-        <div style={S.progressWrap}><div style={{ height: "100%", width: `${progress}%`, background: "#1d4ed8", transition: "width 0.3s", borderRadius: "4px" }} /></div>
+        <div style={S.progressWrap}><div style={{ height: "100%", width: `${progress}%`, background: "#d02a35", transition: "width 0.3s", borderRadius: "4px" }} /></div>
         {SECTIONS.map(section => (
           <div key={section.id} style={S.card}>
             <div style={S.cardHead()}><span style={{ fontSize: "1.1rem" }}>{section.emoji}</span><span style={S.cardHeadText}>{section.label}</span><span style={{ marginLeft: "auto", fontSize: "0.75rem", color: "#93c5fd", fontWeight: 700 }}>{section.items.filter(i => visual[i.id]).length}/{section.items.length}</span></div>
@@ -567,12 +567,12 @@ export default function CheckPage({ mewpId }) {
 
   if (step === 2) return (
     <div style={S.app}>
-      <div style={{ ...S.topbar, background: "#1e40af" }}><div><div style={S.topbarTitle}>Function Checks</div><div style={S.topbarSub}>{doneFn}/{FUNCTION_CHECKS.length} completed · G & P controls</div></div><span style={{ background: "#fff", color: "#1e40af", fontSize: "0.75rem", fontWeight: 800, padding: "0.25rem 0.6rem", borderRadius: "20px" }}>{progress}%</span></div>
+      <div style={{ ...S.topbar, background: "#b02030" }}><div><div style={S.topbarTitle}>Function Checks</div><div style={S.topbarSub}>{doneFn}/{FUNCTION_CHECKS.length} completed · G & P controls</div></div><span style={{ background: "#fff", color: "#b02030", fontSize: "0.75rem", fontWeight: 800, padding: "0.25rem 0.6rem", borderRadius: "20px" }}>{progress}%</span></div>
       <div style={S.container}>
-        <div style={S.progressWrap}><div style={{ height: "100%", width: `${progress}%`, background: "#1e40af", transition: "width 0.3s", borderRadius: "4px" }} /></div>
-        <div style={S.warningBox("#eff6ff", "#bfdbfe", "#1e40af")}>⚡ Test each item using both <strong>Ground (G)</strong> and <strong>Platform (P)</strong> controls.</div>
+        <div style={S.progressWrap}><div style={{ height: "100%", width: `${progress}%`, background: "#b02030", transition: "width 0.3s", borderRadius: "4px" }} /></div>
+        <div style={S.warningBox("#fff1f2", "#fecdd3", "#b02030")}>⚡ Test each item using both <strong>Ground (G)</strong> and <strong>Platform (P)</strong> controls.</div>
         <div style={S.card}>
-          <div style={S.cardHead("#1e40af")}><span style={{ fontSize: "1.1rem" }}>🎮</span><span style={S.cardHeadText}>Function Checks — G & P</span></div>
+          <div style={S.cardHead("#b02030")}><span style={{ fontSize: "1.1rem" }}>🎮</span><span style={S.cardHeadText}>Function Checks — G & P</span></div>
           {FUNCTION_CHECKS.map(item => <FunctionRow key={item.id} item={item} value={fnChecks[item.id]} onChange={(id, key, val) => setFnChecks(p => ({ ...p, [id]: { ...(p[id] || {}), [key]: val } }))} showError={showValidation} />)}
         </div>
         {showValidation && FUNCTION_CHECKS.filter(item => !fnChecks[item.id]?.ground || !fnChecks[item.id]?.platform).length > 0 && (

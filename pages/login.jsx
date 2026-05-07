@@ -7,7 +7,7 @@ const S = {
   card: { background: "#fff", borderRadius: "16px", padding: "2rem", width: "100%", maxWidth: "400px", boxShadow: "0 4px 24px rgba(0,0,0,0.1)" },
   label: { fontSize: "0.75rem", fontWeight: 700, color: "#374151", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: "0.4rem", display: "block" },
   input: { width: "100%", background: "#f9fafb", border: "2px solid #e5e7eb", borderRadius: "10px", color: "#111827", padding: "0.85rem 1rem", fontSize: "1rem", fontFamily: "system-ui, sans-serif", outline: "none", boxSizing: "border-box" },
-  btn: { width: "100%", background: "#1d4ed8", color: "#fff", border: "none", borderRadius: "12px", padding: "1rem", fontSize: "1rem", fontWeight: 800, cursor: "pointer", fontFamily: "system-ui, sans-serif" },
+  btn: { width: "100%", background: "#d02a35", color: "#fff", border: "none", borderRadius: "12px", padding: "1rem", fontSize: "1rem", fontWeight: 800, cursor: "pointer", fontFamily: "system-ui, sans-serif" },
   error: { background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "8px", padding: "0.75rem", fontSize: "0.85rem", color: "#b91c1c" },
 };
 

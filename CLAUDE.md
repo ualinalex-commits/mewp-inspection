@@ -83,7 +83,7 @@ Submit writes to 5 tables: weekly sheet (RPC) → daily entry → 28 visual rows
 
 ## Design
 - White/light theme for outdoor daylight use
-- Blue #1d4ed8 primary, green #15803d pass, red #b91c1c fault
+- Red #d02a35 primary, green #15803d pass, red #b91c1c fault
 - Large PASS/FAIL toggles for construction workers
 - system-ui font, mobile-first, no Tailwind
 
