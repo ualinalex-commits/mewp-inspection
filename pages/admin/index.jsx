@@ -302,14 +302,12 @@ export default function AdminDashboard() {
                 )}
                 {site.manager_name && <div style={{ fontSize: "0.72rem", color: "#9ca3af" }}>Manager: {site.manager_name}</div>}
               </div>
-              <a
-                href={`/site/${site.id}`}
-                target="_blank"
-                rel="noreferrer"
-                style={{ background: "#d02a35", color: "#fff", borderRadius: "8px", padding: "0.4rem 0.85rem", fontSize: "0.78rem", fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap", flexShrink: 0 }}
+              <button
+                onClick={() => router.push(`/site/${site.id}`)}
+                style={{ background: "#d02a35", color: "#fff", border: "none", borderRadius: "8px", padding: "0.4rem 0.85rem", fontSize: "0.78rem", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}
               >
                 View Dashboard
-              </a>
+              </button>
             </div>
           ))}
         </div>
