@@ -184,29 +184,47 @@ export default function AdminDashboard() {
 
   async function checkAuth() {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { router.replace("/login"); return; }
+    if (session) {
+      const { data: profile } = await supabase
+        .from("user_profiles")
+        .select("role, site_id")
+        .eq("id", session.user.id)
+        .single();
 
-    const { data: profile } = await supabase
-      .from("user_profiles")
-      .select("role, site_id")
-      .eq("id", session.user.id)
-      .single();
+      if (!profile) { await supabase.auth.signOut(); router.replace("/login"); return; }
 
-    if (!profile) { await supabase.auth.signOut(); router.replace("/login"); return; }
+      if (profile.role === "site_admin") {
+        router.replace(`/site/${profile.site_id}`);
+        return;
+      }
 
-    if (profile.role === "site_admin") {
-      router.replace(`/site/${profile.site_id}`);
+      if (profile.role !== "main_admin") {
+        router.replace("/login");
+        return;
+      }
+
+      setToken(session.access_token);
+      setAuthLoading(false);
+      loadData(session.access_token);
       return;
     }
 
-    if (profile.role !== "main_admin") {
-      router.replace("/login");
-      return;
+    const bypassToken = typeof window !== "undefined" && localStorage.getItem("admin_bypass_token");
+    if (bypassToken) {
+      const res = await fetch("/api/admin/data", { headers: { Authorization: `Bearer ${bypassToken}` } });
+      if (res.ok) {
+        const data = await res.json();
+        setToken(bypassToken);
+        setSites(data.sites || []);
+        setSiteAdmins(data.siteAdmins || []);
+        setLoading(false);
+        setAuthLoading(false);
+        return;
+      }
+      localStorage.removeItem("admin_bypass_token");
     }
 
-    setToken(session.access_token);
-    setAuthLoading(false);
-    loadData(session.access_token);
+    router.replace("/login");
   }
 
   async function loadData(tok) {
@@ -225,6 +243,7 @@ export default function AdminDashboard() {
   }
 
   async function handleLogout() {
+    localStorage.removeItem("admin_bypass_token");
     await supabase.auth.signOut();
     router.push("/login");
   }
