@@ -20,7 +20,7 @@ const S = {
 
 function Modal({ title, onClose, children }) {
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 200, padding: "1rem" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: "1rem" }}>
       <div style={{ background: "#fff", borderRadius: "16px", width: "100%", maxWidth: "500px", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", boxShadow: "0 -4px 24px rgba(0,0,0,0.15)", maxHeight: "90vh", overflowY: "auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#111827" }}>{title}</div>
