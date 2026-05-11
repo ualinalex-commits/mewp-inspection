@@ -37,11 +37,17 @@ export default function LoginPage() {
   async function redirectBasedOnRole(userId) {
     const { data: profile } = await supabase
       .from("user_profiles")
-      .select("role, site_id, must_change_password")
+      .select("role, site_id, must_change_password, is_archived")
       .eq("id", userId)
       .single();
 
     if (!profile) return false;
+
+    if (profile.is_archived) {
+      await supabase.auth.signOut();
+      setError("Your account has been deactivated. Please contact your administrator.");
+      return false;
+    }
 
     if (profile.must_change_password) {
       setStep("change-password");

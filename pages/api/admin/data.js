@@ -23,7 +23,7 @@ export default async function handler(req, res) {
     supabaseAdmin.from("sites").select("*").order("name"),
     supabaseAdmin
       .from("user_profiles")
-      .select("id, name, email, site_id, must_change_password, sites(name)")
+      .select("id, name, email, site_id, must_change_password, is_archived, sites(name)")
       .eq("role", "site_admin")
       .order("name"),
   ]);
@@ -34,6 +34,7 @@ export default async function handler(req, res) {
     email: a.email,
     site_id: a.site_id,
     must_change_password: a.must_change_password,
+    is_archived: a.is_archived || false,
     site_name: a.sites?.name || null,
   }));
 
