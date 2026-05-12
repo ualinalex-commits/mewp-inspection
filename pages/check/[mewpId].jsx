@@ -465,13 +465,13 @@ export default function CheckPage({ mewpId }) {
 
   if (pageStatus === "already_done") return (
     <div style={S.app}>
-      <div style={{ ...S.topbar, background: "#15803d" }}><div><div style={S.topbarTitle}>✅ Already Inspected Today</div><div style={S.topbarSub}>{mewp?.machine_ref} · <span style={{ fontFamily: "monospace" }}>{mewpId?.slice(0, 8)}</span> · {mewp?.sites?.name}</div></div></div>
+      <div style={{ ...S.topbar, background: "#15803d" }}><div><div style={S.topbarTitle}>✅ Already Inspected Today</div><div style={S.topbarSub}>{mewp?.machine_ref}{mewp?.serial_number ? ` - ${mewp.serial_number}` : ""} · {mewp?.sites?.name}</div></div></div>
       <div style={S.container}>
         <div style={{ textAlign: "center", padding: "2rem 0 1rem" }}><div style={{ fontSize: "4rem", marginBottom: "0.5rem" }}>✅</div><div style={{ fontSize: "1.3rem", fontWeight: 900, color: "#15803d", marginBottom: "0.3rem" }}>Inspection Complete</div><div style={{ color: "#6b7280" }}>This machine has already been checked today</div></div>
         <div style={S.card}>
           <div style={S.cardHead("#15803d")}><span style={{ fontSize: "1.1rem" }}>📋</span><span style={S.cardHeadText}>Today's Record</span></div>
           <div style={{ padding: "1rem" }}>
-            {[["Machine", `${mewp?.machine_ref} · ${mewpId?.slice(0, 8)}`], ["Site", mewp?.sites?.name], ["Inspector", existingEntry.operator_name], ["PAL Card", existingEntry.pal_card_number || "—"], ["Time", fmtTime(existingEntry.submitted_at)], ["Result", existingEntry.daily_status === "fault" ? "⚠️ Faults found" : "✅ All clear"]].map(([k, v]) => (
+            {[["Machine", `${mewp?.machine_ref}${mewp?.serial_number ? ` - ${mewp.serial_number}` : ""}`], ["Site", mewp?.sites?.name], ["Inspector", existingEntry.operator_name], ["PAL Card", existingEntry.pal_card_number || "—"], ["Time", fmtTime(existingEntry.submitted_at)], ["Result", existingEntry.daily_status === "fault" ? "⚠️ Faults found" : "✅ All clear"]].map(([k, v]) => (
               <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "0.65rem 0", borderBottom: "1px solid #f3f4f6", fontSize: "0.95rem" }}>
                 <span style={{ color: "#6b7280", fontWeight: 600 }}>{k}</span><span style={{ color: k === "Result" && existingEntry.daily_status === "fault" ? "#dc2626" : "#111827", fontWeight: 700 }}>{v}</span>
               </div>
@@ -508,12 +508,12 @@ export default function CheckPage({ mewpId }) {
     ];
     return (
       <div style={S.app}>
-        <div style={{ ...S.topbar, background: faultCount > 0 ? "#b91c1c" : "#15803d" }}><div><div style={S.topbarTitle}>{faultCount > 0 ? "⚠️ Faults Logged" : "✅ Inspection Complete"}</div><div style={S.topbarSub}>{mewp?.machine_ref} · <span style={{ fontFamily: "monospace" }}>{mewpId?.slice(0, 8)}</span></div></div></div>
+        <div style={{ ...S.topbar, background: faultCount > 0 ? "#b91c1c" : "#15803d" }}><div><div style={S.topbarTitle}>{faultCount > 0 ? "⚠️ Faults Logged" : "✅ Inspection Complete"}</div><div style={S.topbarSub}>{mewp?.machine_ref}{mewp?.serial_number ? ` - ${mewp.serial_number}` : ""} · {mewp?.sites?.name}</div></div></div>
         <div style={{ ...S.container, paddingTop: "2rem" }}>
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: "4rem", marginBottom: "1rem" }}>{faultCount > 0 ? "⚠️" : "✅"}</div>
             <div style={{ fontSize: "1.3rem", fontWeight: 900, color: faultCount > 0 ? "#b91c1c" : "#15803d", marginBottom: "0.5rem" }}>{faultCount > 0 ? "Faults Logged" : "All Clear"}</div>
-            <div style={{ color: "#6b7280", marginBottom: "0.3rem" }}>{mewp?.machine_ref} · <span style={{ fontFamily: "monospace" }}>{mewpId?.slice(0, 8)}</span> · {mewp?.sites?.name}</div>
+            <div style={{ color: "#6b7280", marginBottom: "0.3rem" }}>{mewp?.machine_ref}{mewp?.serial_number ? ` - ${mewp.serial_number}` : ""} · {mewp?.sites?.name}</div>
             <div style={{ color: "#9ca3af", fontSize: "0.85rem" }}>{operator.name} · {todayLong}</div>
             {faultCount > 0 && <div style={{ ...S.warningBox(), marginTop: "1.5rem", textAlign: "left" }}>⚠️ <strong>{faultCount} fault(s) logged.</strong> Report to your supervisor immediately. Do not operate until cleared.</div>}
           </div>
@@ -536,7 +536,7 @@ export default function CheckPage({ mewpId }) {
 
   if (step === 0) return (
     <div style={S.app}>
-      <div style={S.topbar}><div><div style={S.topbarTitle}>{mewp?.machine_ref} <span style={{ fontFamily: "monospace", fontSize: "0.7rem", opacity: 0.8 }}>{mewpId?.slice(0, 8)}</span></div><div style={S.topbarSub}>{mewp?.sites?.name}{mewp?.model ? ` · ${mewp.model}` : ""}</div></div></div>
+      <div style={S.topbar}><div><div style={S.topbarTitle}>{mewp?.machine_ref}{mewp?.serial_number ? ` - ${mewp.serial_number}` : ""}</div><div style={S.topbarSub}>{mewp?.sites?.name}</div></div></div>
       <div style={S.container}>
         <div style={{ padding: "1rem 0 0.5rem" }}><div style={{ fontSize: "0.7rem", color: "#d02a35", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.3rem" }}>Daily Pre-Use Inspection</div><div style={{ fontSize: "1.2rem", fontWeight: 900, color: "#111827" }}>{todayLong}</div></div>
         <div style={S.card}>
@@ -556,7 +556,7 @@ export default function CheckPage({ mewpId }) {
 
   if (step === 1) return (
     <div style={S.app}>
-      <div style={S.topbar}><div><div style={S.topbarTitle}>Visual Checks</div><div style={S.topbarSub}>{doneVisual}/{totalVisual} completed · {mewp?.machine_ref} · <span style={{ fontFamily: "monospace" }}>{mewpId?.slice(0, 8)}</span></div></div><span style={{ background: "#fff", color: "#d02a35", fontSize: "0.75rem", fontWeight: 800, padding: "0.25rem 0.6rem", borderRadius: "20px" }}>{progress}%</span></div>
+      <div style={S.topbar}><div><div style={S.topbarTitle}>Visual Checks</div><div style={S.topbarSub}>{doneVisual}/{totalVisual} completed · {mewp?.machine_ref}{mewp?.serial_number ? ` - ${mewp.serial_number}` : ""}</div></div><span style={{ background: "#fff", color: "#d02a35", fontSize: "0.75rem", fontWeight: 800, padding: "0.25rem 0.6rem", borderRadius: "20px" }}>{progress}%</span></div>
       <div style={S.container}>
         <div style={S.progressWrap}><div style={{ height: "100%", width: `${progress}%`, background: "#d02a35", transition: "width 0.3s", borderRadius: "4px" }} /></div>
         {SECTIONS.map(section => (
@@ -602,7 +602,7 @@ export default function CheckPage({ mewpId }) {
             <div style={S.cardHead()}><span style={{ fontSize: "1.1rem" }}>📋</span><span style={S.cardHeadText}>Summary</span></div>
             <div style={{ padding: "1rem" }}>
               {[
-                ["Machine", `${mewp?.machine_ref} · ${mewpId?.slice(0, 8)}`],
+                ["Machine", `${mewp?.machine_ref}${mewp?.serial_number ? ` - ${mewp.serial_number}` : ""}`],
                 ["Site", mewp?.sites?.name],
                 ["Operator", operator.name],
                 ["PAL Card", operator.palCard || "—"],
