@@ -223,6 +223,7 @@ export default function CheckPage({ mewpId }) {
   const [submitError, setSubmitError] = useState("");
   const [alreadyDoneFaults, setAlreadyDoneFaults] = useState([]);
   const [showValidation, setShowValidation] = useState(false);
+  const [submitValidation, setSubmitValidation] = useState({ missingPhoto: false, missingSig: false });
   const [photo, setPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const canvasRef = useRef(null);
@@ -306,6 +307,19 @@ export default function CheckPage({ mewpId }) {
     const sigDataUrl = (sigPadRef.current && !sigPadRef.current.isEmpty())
       ? sigPadRef.current.toDataURL("image/png")
       : null;
+
+    const missingPhoto = !photoFile;
+    const missingSig = !sigDataUrl;
+    if (missingPhoto || missingSig) {
+      setSubmitValidation({ missingPhoto, missingSig });
+      if (missingPhoto) {
+        document.getElementById("photo-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      } else {
+        document.getElementById("sig-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      return;
+    }
+    setSubmitValidation({ missingPhoto: false, missingSig: false });
 
     console.log("[upload] starting photo upload", photoFile);
     console.log("[upload] starting signature upload", sigDataUrl ? sigDataUrl.slice(0, 60) + "…" : null);
@@ -631,9 +645,12 @@ export default function CheckPage({ mewpId }) {
           )}
 
           {/* MEWP Photo */}
-          <div style={S.card}>
-            <div style={S.cardHead("#374151")}><span style={{ fontSize: "1.1rem" }}>📷</span><span style={S.cardHeadText}>MEWP Photo (Optional)</span></div>
+          <div id="photo-section" style={{ ...S.card, boxShadow: submitValidation.missingPhoto ? "inset 0 0 0 2px #f97316" : undefined }}>
+            <div style={S.cardHead(submitValidation.missingPhoto ? "#c2410c" : "#374151")}><span style={{ fontSize: "1.1rem" }}>📷</span><span style={S.cardHeadText}>MEWP Photo *</span></div>
             <div style={{ padding: "1rem" }}>
+              {submitValidation.missingPhoto && (
+                <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: "8px", padding: "0.6rem 0.85rem", fontSize: "0.82rem", color: "#c2410c", fontWeight: 700, marginBottom: "0.75rem" }}>⚠️ A photo is required before submitting.</div>
+              )}
               {photoPreview && (
                 <img
                   src={photoPreview}
@@ -642,10 +659,11 @@ export default function CheckPage({ mewpId }) {
                 />
               )}
               <label style={{ display: "block", width: "100%", background: "#374151", color: "#fff", border: "none", borderRadius: "12px", padding: "0.9rem", fontSize: "0.95rem", fontWeight: 700, cursor: "pointer", fontFamily: "system-ui, sans-serif", textAlign: "center", boxSizing: "border-box" }}>
-                {photoPreview ? "📷 Change Photo" : "📷 Take / Upload Photo"}
+                {photoPreview ? "📷 Retake Photo" : "📷 Take Photo"}
                 <input
                   type="file"
                   accept="image/*"
+                  capture="environment"
                   style={{ display: "none" }}
                   onChange={e => {
                     const file = e.target.files?.[0];
@@ -653,6 +671,7 @@ export default function CheckPage({ mewpId }) {
                     if (photoPreview) URL.revokeObjectURL(photoPreview);
                     setPhoto(file);
                     setPhotoPreview(URL.createObjectURL(file));
+                    setSubmitValidation(p => ({ ...p, missingPhoto: false }));
                   }}
                 />
               </label>
@@ -668,16 +687,19 @@ export default function CheckPage({ mewpId }) {
           </div>
 
           {/* Signature pad */}
-          <div style={S.card}>
-            <div style={S.cardHead("#374151")}><span style={{ fontSize: "1.1rem" }}>✍️</span><span style={S.cardHeadText}>Operator Signature (Optional)</span></div>
+          <div id="sig-section" style={{ ...S.card, boxShadow: submitValidation.missingSig ? "inset 0 0 0 2px #f97316" : undefined }}>
+            <div style={S.cardHead(submitValidation.missingSig ? "#c2410c" : "#374151")}><span style={{ fontSize: "1.1rem" }}>✍️</span><span style={S.cardHeadText}>Operator Signature *</span></div>
             <div style={{ padding: "1rem" }}>
+              {submitValidation.missingSig && (
+                <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: "8px", padding: "0.6rem 0.85rem", fontSize: "0.82rem", color: "#c2410c", fontWeight: 700, marginBottom: "0.75rem" }}>⚠️ A signature is required before submitting.</div>
+              )}
               <div style={{ fontSize: "0.82rem", color: "#6b7280", marginBottom: "0.6rem" }}>Draw your signature below using your finger or mouse</div>
               <canvas
                 ref={canvasRef}
                 style={{
                   width: "100%",
                   height: "160px",
-                  border: "2px solid #e5e7eb",
+                  border: `2px solid ${submitValidation.missingSig ? "#f97316" : "#e5e7eb"}`,
                   borderRadius: "10px",
                   background: "#fff",
                   touchAction: "none",
