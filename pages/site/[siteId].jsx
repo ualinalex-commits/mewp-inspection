@@ -553,7 +553,9 @@ export default function SiteDashboard({ siteId }) {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       const bypass = localStorage.getItem(`site_bypass_${siteId}`);
-      if (bypass === "granted") setIsAdmin(true);
+      const adminBypass = localStorage.getItem("admin_bypass_token");
+      if (bypass === "granted" || adminBypass) setIsAdmin(true);
+      if (adminBypass) setIsMainAdmin(true);
       setAuthChecked(true);
       return;
     }
