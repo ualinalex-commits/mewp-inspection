@@ -269,6 +269,42 @@ function MEWPCard({ mewp, todayInspection, initialPdfUrl, initialPdfGeneratedAt,
   const [archiving, setArchiving] = useState(false);
   const nfcUrl = mewp.nfc_url || `${BASE_URL}/check/${mewp.id}`;
   const hasFault = todayInspection?.daily_status === "fault";
+
+  async function downloadMewpQR() {
+    const slug = s => s.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase();
+    const filename = `mewp-qr-${slug(mewp.machine_ref)}${mewp.serial_number ? `-${slug(mewp.serial_number)}` : ""}.png`;
+    const qrDataUrl = await QRCode.toDataURL(nfcUrl, { width: 300, margin: 2 });
+    const hasSerial = !!mewp.serial_number;
+    const padding = 24;
+    const qrSize = 300;
+    const textArea = hasSerial ? 72 : 44;
+    const offscreen = document.createElement("canvas");
+    offscreen.width = qrSize + padding * 2;
+    offscreen.height = qrSize + textArea + padding;
+    const ctx = offscreen.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, offscreen.width, offscreen.height);
+    const img = new Image();
+    await new Promise(resolve => { img.onload = resolve; img.src = qrDataUrl; });
+    ctx.drawImage(img, padding, padding / 2, qrSize, qrSize);
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#111827";
+    ctx.font = "bold 20px system-ui, -apple-system, sans-serif";
+    ctx.fillText(mewp.machine_ref, offscreen.width / 2, qrSize + padding / 2 + 28);
+    if (hasSerial) {
+      ctx.font = "16px system-ui, -apple-system, sans-serif";
+      ctx.fillStyle = "#6b7280";
+      ctx.fillText(mewp.serial_number, offscreen.width / 2, qrSize + padding / 2 + 54);
+    }
+    offscreen.toBlob(blob => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  }
   const [examData, setExamData] = useState({ url: mewp.thorough_exam_url || null, expiry: mewp.thorough_exam_expiry || null, filename: mewp.thorough_exam_filename || null });
   const [showExamModal, setShowExamModal] = useState(false);
 
@@ -433,6 +469,7 @@ function MEWPCard({ mewp, todayInspection, initialPdfUrl, initialPdfGeneratedAt,
               <div style={{ fontSize: "0.75rem", color: "#6b7280", textAlign: "center", fontWeight: 600 }}>Print this QR code and attach it to the physical MEWP</div>
               <QRCanvas url={nfcUrl} size={160} />
               <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "0.6rem 0.85rem", fontSize: "0.65rem", color: "#6b7280", wordBreak: "break-all", textAlign: "center", width: "100%", boxSizing: "border-box" }}>{nfcUrl}</div>
+              <button style={{ ...S.ghostBtn("#d02a35"), width: "100%" }} onClick={downloadMewpQR}>⬇ Download QR Code</button>
             </div>
           )}
 
@@ -573,6 +610,27 @@ export default function SiteDashboard({ siteId }) {
     await supabase.auth.signOut();
     setIsAdmin(false);
     router.push("/login");
+  }
+
+  async function downloadSiteQR() {
+    const slug = s => s.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase();
+    const filename = `site-qr-${slug(site?.name || "site")}.png`;
+    const dataUrl = await QRCode.toDataURL(siteUrl, { width: 400, margin: 2 });
+    const offscreen = document.createElement("canvas");
+    offscreen.width = 400;
+    offscreen.height = 400;
+    const ctx = offscreen.getContext("2d");
+    const img = new Image();
+    await new Promise(resolve => { img.onload = resolve; img.src = dataUrl; });
+    ctx.drawImage(img, 0, 0);
+    offscreen.toBlob(blob => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
   }
 
   useEffect(() => {
@@ -848,6 +906,7 @@ export default function SiteDashboard({ siteId }) {
               <div style={{ fontSize: "0.82rem", color: "#6b7280", textAlign: "center" }}>Print and display at site entrance. Scan to open this dashboard.</div>
               <QRCanvas url={siteUrl} size={200} />
               <div style={{ fontSize: "0.7rem", color: "#9ca3af", wordBreak: "break-all", textAlign: "center" }}>{siteUrl}</div>
+              <button style={{ ...S.ghostBtn("#d02a35"), width: "100%" }} onClick={downloadSiteQR}>⬇ Download QR Code</button>
             </div>
           )}
         </div>
