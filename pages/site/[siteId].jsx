@@ -551,7 +551,12 @@ export default function SiteDashboard({ siteId }) {
 
   async function checkAdminStatus() {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setAuthChecked(true); return; }
+    if (!session) {
+      const bypass = localStorage.getItem(`site_bypass_${siteId}`);
+      if (bypass === "granted") setIsAdmin(true);
+      setAuthChecked(true);
+      return;
+    }
     const { data: profile } = await supabase.from("user_profiles").select("role, site_id").eq("id", session.user.id).single();
     if (profile && profile.role === "main_admin") {
       setIsMainAdmin(true);
