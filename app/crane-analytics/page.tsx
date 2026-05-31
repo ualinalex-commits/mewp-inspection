@@ -528,15 +528,20 @@ export default function CraneAnalytics() {
                         <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
                         <YAxis tickFormatter={v => fmtMins(v)} tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} width={48} />
                         <RTooltip content={<BarTip />} cursor={{ fill: '#f9fafb' }} />
-                        <Bar dataKey="idle" name="Idle Time" fill="#e5e7eb" radius={[4, 4, 0, 0]} maxBarSize={36} />
+                        <Bar dataKey="idle" name="Idle Time" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={36} />
                       </BarChart>
                     </ResponsiveContainer>
                   </ChartCard>
 
+                </div>
+
+                {/* Pie charts row — two equal cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+
                   {/* Time by Company — right-side legend */}
-                  <ChartCard title="Time Allocation by Company" sub="Share of working time per company" style={{ minWidth: '520px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', minHeight: '210px' }}>
-                      <div style={{ flex: '0 0 190px', height: '210px' }}>
+                  <ChartCard title="Time Allocation by Company" sub="Share of working time per company">
+                    <div style={{ display: 'flex', alignItems: 'center', height: '210px' }}>
+                      <div style={{ flex: '0 0 50%', height: '210px' }}>
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
                             <Pie data={byCompany} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={82} innerRadius={32}>
@@ -546,16 +551,16 @@ export default function CraneAnalytics() {
                           </PieChart>
                         </ResponsiveContainer>
                       </div>
-                      <div style={{ flex: 1, paddingLeft: '0.75rem', minWidth: 0 }}>
+                      <div style={{ flex: '0 0 50%', paddingLeft: '0.75rem', boxSizing: 'border-box', overflow: 'hidden' }}>
                         <PieLegend data={byCompany} total={companyTotal} />
                       </div>
                     </div>
                   </ChartCard>
 
                   {/* Time by Status — right-side legend */}
-                  <ChartCard title="Time Allocation by Status" sub="Share of working time per lift status" style={{ minWidth: '520px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', minHeight: '210px' }}>
-                      <div style={{ flex: '0 0 190px', height: '210px' }}>
+                  <ChartCard title="Time Allocation by Status" sub="Share of working time per lift status">
+                    <div style={{ display: 'flex', alignItems: 'center', height: '210px' }}>
+                      <div style={{ flex: '0 0 50%', height: '210px' }}>
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
                             <Pie data={byStatus} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={82} innerRadius={32}>
@@ -565,7 +570,7 @@ export default function CraneAnalytics() {
                           </PieChart>
                         </ResponsiveContainer>
                       </div>
-                      <div style={{ flex: 1, paddingLeft: '0.75rem', minWidth: 0 }}>
+                      <div style={{ flex: '0 0 50%', paddingLeft: '0.75rem', boxSizing: 'border-box', overflow: 'hidden' }}>
                         <PieLegend data={byStatus} total={statusTotal} />
                       </div>
                     </div>
