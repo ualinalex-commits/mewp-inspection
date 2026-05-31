@@ -10,11 +10,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { site_id, day_start_time, day_end_time } = body;
+  const { id, day_start_time, day_end_time } = body;
 
-  if (!site_id || !day_start_time || !day_end_time) {
+  if (!id || !day_start_time || !day_end_time) {
     return NextResponse.json(
-      { error: "site_id, day_start_time and day_end_time are required" },
+      { error: "id, day_start_time and day_end_time are required" },
       { status: 400 }
     );
   }
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
   const { error } = await supabase
     .from("crane_logs_sites")
     .update({ day_start_time, day_end_time })
-    .eq("id", site_id);
+    .eq("id", id);
 
   if (error) {
     console.error("Supabase update error:", error);
