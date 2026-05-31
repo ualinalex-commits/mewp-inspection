@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import {
@@ -209,13 +209,14 @@ const tdBase: React.CSSProperties = {
   borderBottom: '1px solid #f3f4f6',
 };
 
-export default function CraneAnalytics() {
+function CraneAnalyticsContent() {
   const searchParams = useSearchParams();
   const [startDate, setStartDate] = useState(isoMonthStart());
   const [endDate, setEndDate] = useState(isoMonthEnd());
   const [site, setSite] = useState('');
   const [crane, setCrane] = useState('');
   const [lockedSiteName, setLockedSiteName] = useState<string | null>(null);
+  const [siteParamResolved, setSiteParamResolved] = useState(false);
   const [rows, setRows] = useState<CraneLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -226,7 +227,7 @@ export default function CraneAnalytics() {
 
   useEffect(() => {
     const siteId = searchParams.get('siteId');
-    if (!siteId) return;
+    if (!siteId) { setSiteParamResolved(true); return; }
     supabase
       .from('crane_logs_sites')
       .select('name')
@@ -234,25 +235,26 @@ export default function CraneAnalytics() {
       .single()
       .then(({ data }) => {
         if (data?.name) setLockedSiteName(data.name);
+        setSiteParamResolved(true);
       });
   }, [searchParams]);
 
   useEffect(() => {
-    setSite('');
-    setCrane('');
+    if (!siteParamResolved) return;
     setLoading(true);
     setError(null);
-    supabase
+    let query = supabase
       .from('crane_logs')
       .select('site, crane, company, status, date, start_time, end_time, supervisor_name, load_description')
       .gte('date', startDate)
-      .lte('date', endDate)
-      .then(({ data, error: err }) => {
-        setLoading(false);
-        if (err) { setError(err.message); return; }
-        setRows((data as CraneLog[]) ?? []);
-      });
-  }, [startDate, endDate]);
+      .lte('date', endDate);
+    if (lockedSiteName) query = query.eq('site', lockedSiteName);
+    query.then(({ data, error: err }) => {
+      setLoading(false);
+      if (err) { setError(err.message); return; }
+      setRows((data as CraneLog[]) ?? []);
+    });
+  }, [startDate, endDate, siteParamResolved, lockedSiteName]);
 
   const sites = useMemo(
     () => Array.from(new Set(rows.map(r => r.site).filter(Boolean))).sort(),
@@ -423,7 +425,7 @@ export default function CraneAnalytics() {
       if (va > vb) return sortDir === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [rows, site, crane, sortCol, sortDir]);
+  }, [rows, effectiveSite, crane, sortCol, sortDir]);
 
   function toggleSort(col: string) {
     if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -703,5 +705,13 @@ export default function CraneAnalytics() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function CraneAnalytics() {
+  return (
+    <Suspense>
+      <CraneAnalyticsContent />
+    </Suspense>
   );
 }
