@@ -227,14 +227,16 @@ function CraneAnalyticsContent() {
 
   useEffect(() => {
     const siteId = searchParams?.get('siteId');
+    console.log('[crane-analytics] siteId from URL:', siteId);
     if (!siteId) { setSiteParamResolved(true); return; }
     supabase
       .from('crane_logs_sites')
-      .select('name')
+      .select('site_name')
       .eq('id', siteId)
       .single()
-      .then(({ data }) => {
-        if (data?.name) setLockedSiteName(data.name);
+      .then(({ data, error: err }) => {
+        console.log('[crane-analytics] crane_logs_sites lookup result:', { data, err });
+        if (data?.site_name) setLockedSiteName(data.site_name);
         setSiteParamResolved(true);
       });
   }, [searchParams]);
@@ -469,15 +471,6 @@ function CraneAnalyticsContent() {
                 <option value="">All Sites</option>
                 {sites.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
-            </div>
-          )}
-          {lockedSiteName && (
-            <div style={{ flex: '2 1 200px', minWidth: '150px' }}>
-              <label style={labelStyle}>Site</label>
-              <div style={{ ...inputStyle, background: '#f3f4f6', color: '#374151', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: BRAND, flexShrink: 0 }} />
-                {lockedSiteName}
-              </div>
             </div>
           )}
           <div style={{ flex: '1 1 130px', minWidth: '110px' }}>
