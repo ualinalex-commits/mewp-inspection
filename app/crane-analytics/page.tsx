@@ -657,6 +657,16 @@ function CraneAnalyticsContent() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f3f4f6', fontFamily: 'system-ui, -apple-system, sans-serif', color: '#111827', paddingBottom: '3rem' }}>
+      <style>{`
+        @media (max-width: 767px) {
+          .ca-filter-item { flex: 1 1 100% !important; min-width: 0 !important; }
+          .ca-stat-grid  { grid-template-columns: repeat(2, 1fr) !important; }
+          .ca-pie-grid   { grid-template-columns: 1fr !important; }
+          .ca-pie-inner  { flex-direction: column !important; height: auto !important; }
+          .ca-pie-chart-half  { flex: none !important; width: 100% !important; height: 200px !important; }
+          .ca-pie-legend-half { flex: none !important; width: 100% !important; padding-left: 0 !important; padding-top: 0.75rem; }
+        }
+      `}</style>
 
       {/* Header */}
       <div style={{ background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '0.9rem 1.5rem' }}>
@@ -700,16 +710,16 @@ function CraneAnalyticsContent() {
 
         {/* Filters */}
         <div style={{ background: '#fff', borderRadius: '12px', padding: '1rem 1.25rem', marginBottom: '1.25rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'flex-end' }}>
-          <div style={{ flex: '1 1 140px', minWidth: '130px' }}>
+          <div className="ca-filter-item" style={{ flex: '1 1 140px', minWidth: '130px' }}>
             <label style={labelStyle}>Start Date</label>
             <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={inputStyle} />
           </div>
-          <div style={{ flex: '1 1 140px', minWidth: '130px' }}>
+          <div className="ca-filter-item" style={{ flex: '1 1 140px', minWidth: '130px' }}>
             <label style={labelStyle}>End Date</label>
             <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={inputStyle} />
           </div>
           {!lockedSiteName && (
-            <div style={{ flex: '2 1 200px', minWidth: '150px' }}>
+            <div className="ca-filter-item" style={{ flex: '2 1 200px', minWidth: '150px' }}>
               <label style={labelStyle}>Site</label>
               <select value={site} onChange={e => setSite(e.target.value)} style={selectStyle}>
                 <option value="">All Sites</option>
@@ -717,7 +727,7 @@ function CraneAnalyticsContent() {
               </select>
             </div>
           )}
-          <div style={{ flex: '1 1 130px', minWidth: '110px' }}>
+          <div className="ca-filter-item" style={{ flex: '1 1 130px', minWidth: '110px' }}>
             <label style={labelStyle}>Crane</label>
             <select value={crane} onChange={e => setCrane(e.target.value)} style={selectStyle}>
               <option value="">All Cranes</option>
@@ -743,7 +753,7 @@ function CraneAnalyticsContent() {
         {!loading && (
           <>
             {/* 7 Stat Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
+            <div className="ca-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
               <StatCard value={stats.totalLifts.toLocaleString()} label="Total Lifts" />
               <StatCard value={fmtMins(stats.totalMins)} label="Total Working Time" />
               <StatCard value={fmtMins(stats.avgMins)} label="Avg Lift Duration" />
@@ -809,14 +819,14 @@ function CraneAnalyticsContent() {
 
                 </div>
 
-                {/* Pie charts row — two equal cards */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                {/* Pie charts row — two equal cards, stack on mobile */}
+                <div className="ca-pie-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
 
-                  {/* Time by Company — right-side legend */}
+                  {/* Time by Company */}
                   <div ref={chartByCompany}>
                     <ChartCard title="Time Allocation by Company" sub="Share of working time per company">
-                      <div style={{ display: 'flex', alignItems: 'center', height: '210px' }}>
-                        <div style={{ flex: '0 0 50%', height: '210px' }}>
+                      <div className="ca-pie-inner" style={{ display: 'flex', alignItems: 'center', height: '210px' }}>
+                        <div className="ca-pie-chart-half" style={{ flex: '0 0 50%', height: '210px' }}>
                           <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                               <Pie data={byCompany} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={82} innerRadius={32}>
@@ -826,18 +836,18 @@ function CraneAnalyticsContent() {
                             </PieChart>
                           </ResponsiveContainer>
                         </div>
-                        <div style={{ flex: '0 0 50%', paddingLeft: '0.75rem', boxSizing: 'border-box', overflow: 'hidden' }}>
+                        <div className="ca-pie-legend-half" style={{ flex: '0 0 50%', paddingLeft: '0.75rem', boxSizing: 'border-box', overflow: 'hidden' }}>
                           <PieLegend data={byCompany} total={companyTotal} />
                         </div>
                       </div>
                     </ChartCard>
                   </div>
 
-                  {/* Time by Status — right-side legend */}
+                  {/* Time by Status */}
                   <div ref={chartByStatus}>
                     <ChartCard title="Time Allocation by Status" sub="Share of working time per lift status">
-                      <div style={{ display: 'flex', alignItems: 'center', height: '210px' }}>
-                        <div style={{ flex: '0 0 50%', height: '210px' }}>
+                      <div className="ca-pie-inner" style={{ display: 'flex', alignItems: 'center', height: '210px' }}>
+                        <div className="ca-pie-chart-half" style={{ flex: '0 0 50%', height: '210px' }}>
                           <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                               <Pie data={byStatus} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={82} innerRadius={32}>
@@ -847,7 +857,7 @@ function CraneAnalyticsContent() {
                             </PieChart>
                           </ResponsiveContainer>
                         </div>
-                        <div style={{ flex: '0 0 50%', paddingLeft: '0.75rem', boxSizing: 'border-box', overflow: 'hidden' }}>
+                        <div className="ca-pie-legend-half" style={{ flex: '0 0 50%', paddingLeft: '0.75rem', boxSizing: 'border-box', overflow: 'hidden' }}>
                           <PieLegend data={byStatus} total={statusTotal} />
                         </div>
                       </div>
@@ -862,7 +872,7 @@ function CraneAnalyticsContent() {
                     Daily Breakdown
                   </div>
                   <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <table style={{ width: '100%', minWidth: '650px', borderCollapse: 'collapse' }}>
                       <thead>
                         <tr>
                           {['Date', 'Crane', 'Total Lifts', 'Working', 'Idle', 'Idle %', 'First Lift', 'Last Lift'].map(col => (
@@ -903,7 +913,7 @@ function CraneAnalyticsContent() {
                     <div style={{ fontSize: '0.72rem', color: '#9ca3af' }}>{sortedLogs.length.toLocaleString()} records</div>
                   </div>
                   <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <table style={{ width: '100%', minWidth: '900px', borderCollapse: 'collapse' }}>
                       <thead>
                         <tr>
                           {LOG_COLS.map(col => (
