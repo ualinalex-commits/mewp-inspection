@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
-  ResponsiveContainer, PieChart, Pie, Cell, Legend,
+  ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts';
 
 type CraneLog = {
@@ -15,18 +15,31 @@ type CraneLog = {
   date: string;
   start_time: string;
   end_time: string;
+  supervisor_name: string;
+  load_description: string;
 };
+
+type SortDir = 'asc' | 'desc';
 
 const BRAND = '#d02a35';
 const COLORS = [
   BRAND, '#2563eb', '#16a34a', '#ea580c',
   '#7c3aed', '#0891b2', '#be185d', '#ca8a04', '#0f766e', '#9333ea',
 ];
-const MONTHS = [
-  'January','February','March','April','May','June',
-  'July','August','September','October','November','December',
+const IDLE_WINDOW = 600;
+
+const LOG_COLS: { key: string; label: string }[] = [
+  { key: 'date', label: 'Date' },
+  { key: 'site', label: 'Site' },
+  { key: 'crane', label: 'Crane' },
+  { key: 'supervisor', label: 'Supervisor' },
+  { key: 'company', label: 'Company' },
+  { key: 'load', label: 'Load Description' },
+  { key: 'status', label: 'Status' },
+  { key: 'start', label: 'Start Time' },
+  { key: 'end', label: 'End Time' },
+  { key: 'duration', label: 'Duration' },
 ];
-const IDLE_WINDOW = 600; // 10-hour crane day in minutes
 
 function parseMins(start: string | null, end: string | null): number {
   if (!start || !end) return 0;
@@ -44,17 +57,41 @@ function fmtMins(mins: number): string {
   return `${h}h ${m}m`;
 }
 
-function shortDate(d: string): string {
-  const parts = d.split('-');
+function fmtTime(dt: string | null): string {
+  if (!dt) return '—';
+  const d = new Date(dt.replace(' ', 'T'));
+  if (isNaN(d.getTime())) return dt;
+  return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+}
+
+function fmtDateLong(d: string): string {
+  const [y, mo, day] = d.split('-');
   const mNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return `${parseInt(parts[2])} ${mNames[parseInt(parts[1]) - 1]}`;
+  return `${parseInt(day)} ${mNames[parseInt(mo) - 1]} ${y}`;
+}
+
+function shortDate(d: string): string {
+  const [, mo, day] = d.split('-');
+  const mNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${parseInt(day)} ${mNames[parseInt(mo) - 1]}`;
+}
+
+function isoMonthStart(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+}
+
+function isoMonthEnd(): string {
+  const d = new Date();
+  const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  return last.toISOString().slice(0, 10);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function BarTip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
-    <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '0.5rem 0.75rem', boxShadow: '0 4px 12px rgba(0,0,0,0.12)', fontSize: '0.8rem', minWidth: '120px' }}>
+    <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '0.5rem 0.75rem', boxShadow: '0 4px 12px rgba(0,0,0,0.12)', fontSize: '0.8rem', minWidth: '130px' }}>
       <div style={{ fontWeight: 700, marginBottom: '0.3rem', color: '#111827' }}>{label}</div>
       {payload.map((p: { name: string; value: number; color?: string }, i: number) => (
         <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', color: '#374151' }}>
@@ -81,7 +118,7 @@ function PieTip({ active, payload }: any) {
 function StatCard({ value, label }: { value: string; label: string }) {
   return (
     <div style={{ background: '#fff', borderRadius: '12px', padding: '1rem 1.25rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-      <div style={{ fontSize: '1.55rem', fontWeight: 800, color: '#111827', lineHeight: 1, wordBreak: 'break-word' }}>{value}</div>
+      <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#111827', lineHeight: 1, wordBreak: 'break-word' }}>{value}</div>
       <div style={{ fontSize: '0.67rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: '0.45rem' }}>{label}</div>
     </div>
   );
@@ -91,9 +128,25 @@ function ChartCard({ title, sub, children, fullWidth }: { title: string; sub?: s
   return (
     <div style={{ background: '#fff', borderRadius: '12px', padding: '1.25rem 1.25rem 1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', gridColumn: fullWidth ? '1 / -1' : undefined }}>
       <div style={{ fontSize: '0.73rem', fontWeight: 800, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{title}</div>
-      {sub && <div style={{ fontSize: '0.68rem', color: '#9ca3af', marginTop: '0.1rem', marginBottom: '1.1rem' }}>{sub}</div>}
-      {!sub && <div style={{ marginBottom: '1.1rem' }} />}
+      <div style={{ fontSize: '0.68rem', color: '#9ca3af', marginTop: '0.1rem', marginBottom: '1.1rem' }}>{sub ?? ' '}</div>
       {children}
+    </div>
+  );
+}
+
+function PieLegend({ data, total }: { data: { name: string; value: number }[]; total: number }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.38rem', justifyContent: 'center' }}>
+      {data.map((item, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.72rem' }}>
+          <div style={{ width: 8, height: 8, borderRadius: '50%', background: COLORS[i % COLORS.length], flexShrink: 0 }} />
+          <span style={{ flex: 1, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
+          <span style={{ color: '#6b7280', flexShrink: 0, marginLeft: '0.25rem' }}>{fmtMins(item.value)}</span>
+          <span style={{ color: '#9ca3af', flexShrink: 0, minWidth: '30px', textAlign: 'right' }}>
+            {total > 0 ? `${Math.round((item.value / total) * 100)}%` : '0%'}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -111,6 +164,19 @@ const selectStyle: React.CSSProperties = {
   width: '100%',
 };
 
+const inputStyle: React.CSSProperties = {
+  background: '#f9fafb',
+  border: '2px solid #e5e7eb',
+  borderRadius: '8px',
+  color: '#111827',
+  padding: '0.55rem 0.75rem',
+  fontSize: '0.9rem',
+  fontFamily: 'system-ui, sans-serif',
+  outline: 'none',
+  width: '100%',
+  boxSizing: 'border-box',
+};
+
 const labelStyle: React.CSSProperties = {
   fontSize: '0.67rem',
   fontWeight: 700,
@@ -121,35 +187,46 @@ const labelStyle: React.CSSProperties = {
   marginBottom: '0.3rem',
 };
 
+const thBase: React.CSSProperties = {
+  padding: '0.6rem 0.75rem',
+  textAlign: 'left',
+  fontSize: '0.67rem',
+  fontWeight: 700,
+  color: '#6b7280',
+  textTransform: 'uppercase',
+  letterSpacing: '0.06em',
+  whiteSpace: 'nowrap',
+  borderBottom: '2px solid #f3f4f6',
+  background: '#fff',
+};
+
+const tdBase: React.CSSProperties = {
+  padding: '0.55rem 0.75rem',
+  fontSize: '0.82rem',
+  color: '#374151',
+  whiteSpace: 'nowrap',
+  borderBottom: '1px solid #f3f4f6',
+};
+
 export default function CraneAnalytics() {
-  const now = new Date();
-  const [month, setMonth] = useState(now.getMonth() + 1);
-  const [year, setYear] = useState(now.getFullYear());
+  const [startDate, setStartDate] = useState(isoMonthStart());
+  const [endDate, setEndDate] = useState(isoMonthEnd());
   const [site, setSite] = useState('');
   const [crane, setCrane] = useState('');
   const [rows, setRows] = useState<CraneLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sortCol, setSortCol] = useState('date');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
 
-  const YEARS = useMemo(() => {
-    const cy = new Date().getFullYear();
-    return [cy - 1, cy, cy + 1];
-  }, []);
-
-  // Fetch when month/year changes
   useEffect(() => {
     setSite('');
     setCrane('');
     setLoading(true);
     setError(null);
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const startDate = `${year}-${pad(month)}-01`;
-    const lastDay = new Date(year, month, 0).getDate();
-    const endDate = `${year}-${pad(month)}-${pad(lastDay)}`;
-
     supabase
       .from('crane_logs')
-      .select('site, crane, company, status, date, start_time, end_time')
+      .select('site, crane, company, status, date, start_time, end_time, supervisor_name, load_description')
       .gte('date', startDate)
       .lte('date', endDate)
       .then(({ data, error: err }) => {
@@ -157,7 +234,7 @@ export default function CraneAnalytics() {
         if (err) { setError(err.message); return; }
         setRows((data as CraneLog[]) ?? []);
       });
-  }, [month, year]);
+  }, [startDate, endDate]);
 
   const sites = useMemo(
     () => Array.from(new Set(rows.map(r => r.site).filter(Boolean))).sort(),
@@ -169,7 +246,6 @@ export default function CraneAnalytics() {
     return Array.from(new Set(base.map(r => r.crane).filter(Boolean))).sort();
   }, [rows, site]);
 
-  // Reset crane selection if it disappears after site change
   useEffect(() => {
     if (crane && !cranes.includes(crane)) setCrane('');
   }, [cranes, crane]);
@@ -181,21 +257,56 @@ export default function CraneAnalytics() {
     return d;
   }, [rows, site, crane]);
 
-  // Summary stats
-  const stats = useMemo(() => {
-    let totalMins = 0;
-    const craneCounts: Record<string, number> = {};
+  // Per-crane, per-day working minutes map
+  const craneDay = useMemo(() => {
+    const map: Record<string, Record<string, number>> = {};
     for (const r of filtered) {
-      totalMins += parseMins(r.start_time, r.end_time);
-      craneCounts[r.crane] = (craneCounts[r.crane] ?? 0) + 1;
+      if (!map[r.crane]) map[r.crane] = {};
+      map[r.crane][r.date] = (map[r.crane][r.date] ?? 0) + parseMins(r.start_time, r.end_time);
     }
-    const totalLifts = filtered.length;
-    const avgMins = totalLifts > 0 ? totalMins / totalLifts : 0;
-    const topCrane = Object.entries(craneCounts).sort(([, a], [, b]) => b - a)[0]?.[0] ?? '—';
-    return { totalLifts, totalMins, avgMins, topCrane };
+    return map;
   }, [filtered]);
 
-  // Working Time by Day
+  const stats = useMemo(() => {
+    let totalMins = 0;
+    let totalIdleMins = 0;
+    let totalIdlePctSum = 0;
+    let totalCraneDayPairs = 0;
+    const craneCounts: Record<string, number> = {};
+    const dayMins: Record<string, number> = {};
+
+    for (const r of filtered) {
+      const m = parseMins(r.start_time, r.end_time);
+      totalMins += m;
+      craneCounts[r.crane] = (craneCounts[r.crane] ?? 0) + 1;
+      dayMins[r.date] = (dayMins[r.date] ?? 0) + m;
+    }
+    for (const days of Object.values(craneDay)) {
+      for (const working of Object.values(days)) {
+        const idle = Math.max(0, IDLE_WINDOW - working);
+        totalIdleMins += idle;
+        totalIdlePctSum += (idle / IDLE_WINDOW) * 100;
+        totalCraneDayPairs++;
+      }
+    }
+
+    const totalLifts = filtered.length;
+    const avgMins = totalLifts > 0 ? totalMins / totalLifts : 0;
+    const avgDailyIdlePct = totalCraneDayPairs > 0 ? totalIdlePctSum / totalCraneDayPairs : 0;
+    const topCrane = Object.entries(craneCounts).sort(([, a], [, b]) => b - a)[0]?.[0] ?? '—';
+    const busiestDay = Object.entries(dayMins).sort(([, a], [, b]) => b - a)[0]?.[0];
+
+    return {
+      totalLifts,
+      totalMins,
+      avgMins,
+      topCrane,
+      totalIdleMins,
+      avgDailyIdlePct,
+      busiestDayFmt: busiestDay ? shortDate(busiestDay) : '—',
+    };
+  }, [filtered, craneDay]);
+
   const workingByDay = useMemo(() => {
     const map: Record<string, number> = {};
     for (const r of filtered) {
@@ -206,26 +317,29 @@ export default function CraneAnalytics() {
       .map(([date, mins]) => ({ date: shortDate(date), mins: Math.round(mins) }));
   }, [filtered]);
 
-  // Idle Time by Crane — average working vs idle per active day (600 min window)
-  const idleByCrane = useMemo(() => {
-    const craneDay: Record<string, Record<string, number>> = {};
-    for (const r of filtered) {
-      if (!craneDay[r.crane]) craneDay[r.crane] = {};
-      craneDay[r.crane][r.date] = (craneDay[r.crane][r.date] ?? 0) + parseMins(r.start_time, r.end_time);
+  const idleByDay = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const days of Object.values(craneDay)) {
+      for (const [date, working] of Object.entries(days)) {
+        map[date] = (map[date] ?? 0) + Math.max(0, IDLE_WINDOW - working);
+      }
     }
+    return Object.entries(map)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, idle]) => ({ date: shortDate(date), idle: Math.round(idle) }));
+  }, [craneDay]);
+
+  const idleByCrane = useMemo(() => {
     return Object.entries(craneDay)
       .map(([craneName, days]) => {
-        const dayVals = Object.values(days);
-        const totalWorking = dayVals.reduce((a, b) => a + b, 0);
-        const avgWorking = Math.round(totalWorking / dayVals.length);
-        const avgIdle = Math.max(0, IDLE_WINDOW - avgWorking);
-        return { crane: craneName, working: avgWorking, idle: avgIdle, days: dayVals.length };
+        const vals = Object.values(days);
+        const avgWorking = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+        return { crane: craneName, working: avgWorking, idle: Math.max(0, IDLE_WINDOW - avgWorking) };
       })
       .sort((a, b) => b.idle - a.idle)
       .slice(0, 16);
-  }, [filtered]);
+  }, [craneDay]);
 
-  // Time Allocation by Company
   const byCompany = useMemo(() => {
     const map: Record<string, number> = {};
     for (const r of filtered) {
@@ -238,7 +352,6 @@ export default function CraneAnalytics() {
       .map(([name, value]) => ({ name, value: Math.round(value) }));
   }, [filtered]);
 
-  // Time Allocation by Status
   const byStatus = useMemo(() => {
     const map: Record<string, number> = {};
     for (const r of filtered) {
@@ -250,14 +363,65 @@ export default function CraneAnalytics() {
       .map(([name, value]) => ({ name, value: Math.round(value) }));
   }, [filtered]);
 
+  const dailyBreakdown = useMemo(() => {
+    type Row = {
+      date: string; crane: string; lifts: number; workingMins: number;
+      firstLift: string | null; lastLift: string | null;
+    };
+    const map: Record<string, Row> = {};
+    for (const r of filtered) {
+      const key = `${r.date}__${r.crane}`;
+      if (!map[key]) map[key] = { date: r.date, crane: r.crane, lifts: 0, workingMins: 0, firstLift: null, lastLift: null };
+      map[key].lifts++;
+      map[key].workingMins += parseMins(r.start_time, r.end_time);
+      if (!map[key].firstLift || r.start_time < map[key].firstLift!) map[key].firstLift = r.start_time;
+      if (!map[key].lastLift || r.end_time > map[key].lastLift!) map[key].lastLift = r.end_time;
+    }
+    return Object.values(map)
+      .sort((a, b) => a.date.localeCompare(b.date) || a.crane.localeCompare(b.crane))
+      .map(row => {
+        const w = Math.round(row.workingMins);
+        const idle = Math.max(0, IDLE_WINDOW - w);
+        return { ...row, workingMins: w, idleMins: idle, idlePct: Math.round((idle / IDLE_WINDOW) * 100) };
+      });
+  }, [filtered]);
+
+  const sortedLogs = useMemo(() => {
+    const base = rows.filter(r => (!site || r.site === site) && (!crane || r.crane === crane));
+    return [...base].sort((a, b) => {
+      let va: string | number = '';
+      let vb: string | number = '';
+      if (sortCol === 'date')       { va = a.date ?? '';              vb = b.date ?? ''; }
+      else if (sortCol === 'site')  { va = a.site ?? '';              vb = b.site ?? ''; }
+      else if (sortCol === 'crane') { va = a.crane ?? '';             vb = b.crane ?? ''; }
+      else if (sortCol === 'supervisor') { va = a.supervisor_name ?? ''; vb = b.supervisor_name ?? ''; }
+      else if (sortCol === 'company')    { va = a.company ?? '';         vb = b.company ?? ''; }
+      else if (sortCol === 'load')       { va = a.load_description ?? ''; vb = b.load_description ?? ''; }
+      else if (sortCol === 'status')     { va = a.status ?? '';           vb = b.status ?? ''; }
+      else if (sortCol === 'start')      { va = a.start_time ?? '';       vb = b.start_time ?? ''; }
+      else if (sortCol === 'end')        { va = a.end_time ?? '';         vb = b.end_time ?? ''; }
+      else if (sortCol === 'duration')   { va = parseMins(a.start_time, a.end_time); vb = parseMins(b.start_time, b.end_time); }
+      if (va < vb) return sortDir === 'asc' ? -1 : 1;
+      if (va > vb) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [rows, site, crane, sortCol, sortDir]);
+
+  function toggleSort(col: string) {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortCol(col); setSortDir('asc'); }
+  }
+
   const noData = !loading && filtered.length === 0;
+  const companyTotal = byCompany.reduce((s, r) => s + r.value, 0);
+  const statusTotal = byStatus.reduce((s, r) => s + r.value, 0);
 
   return (
     <div style={{ minHeight: '100vh', background: '#f3f4f6', fontFamily: 'system-ui, -apple-system, sans-serif', color: '#111827', paddingBottom: '3rem' }}>
 
       {/* Header */}
       <div style={{ background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '0.9rem 1.5rem' }}>
-        <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <div style={{ maxWidth: '1160px', margin: '0 auto', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <div style={{ width: '8px', height: '28px', background: BRAND, borderRadius: '4px', flexShrink: 0 }} />
           <div>
             <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#111827', lineHeight: 1 }}>Crane Log Analytics</div>
@@ -266,21 +430,17 @@ export default function CraneAnalytics() {
         </div>
       </div>
 
-      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '1.25rem 1rem' }}>
+      <div style={{ maxWidth: '1160px', margin: '0 auto', padding: '1.25rem 1rem' }}>
 
         {/* Filters */}
         <div style={{ background: '#fff', borderRadius: '12px', padding: '1rem 1.25rem', marginBottom: '1.25rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'flex-end' }}>
-          <div style={{ flex: '1 1 130px', minWidth: '110px' }}>
-            <label style={labelStyle}>Month</label>
-            <select value={month} onChange={e => setMonth(Number(e.target.value))} style={selectStyle}>
-              {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-            </select>
+          <div style={{ flex: '1 1 140px', minWidth: '130px' }}>
+            <label style={labelStyle}>Start Date</label>
+            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={inputStyle} />
           </div>
-          <div style={{ flex: '0 1 90px', minWidth: '80px' }}>
-            <label style={labelStyle}>Year</label>
-            <select value={year} onChange={e => setYear(Number(e.target.value))} style={selectStyle}>
-              {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
+          <div style={{ flex: '1 1 140px', minWidth: '130px' }}>
+            <label style={labelStyle}>End Date</label>
+            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={inputStyle} />
           </div>
           <div style={{ flex: '2 1 200px', minWidth: '150px' }}>
             <label style={labelStyle}>Site</label>
@@ -298,17 +458,15 @@ export default function CraneAnalytics() {
           </div>
         </div>
 
-        {/* Error */}
         {error && (
           <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1rem', color: '#991b1b', fontSize: '0.85rem' }}>
             {error}
           </div>
         )}
 
-        {/* Loading */}
         {loading && (
           <div style={{ textAlign: 'center', padding: '4rem 1rem', color: '#9ca3af' }}>
-            <div style={{ width: '36px', height: '36px', border: `3px solid #e5e7eb`, borderTopColor: BRAND, borderRadius: '50%', margin: '0 auto 0.75rem', animation: 'spin 0.8s linear infinite' }} />
+            <div style={{ width: '36px', height: '36px', border: '3px solid #e5e7eb', borderTopColor: BRAND, borderRadius: '50%', margin: '0 auto 0.75rem', animation: 'spin 0.8s linear infinite' }} />
             <div style={{ fontSize: '0.875rem' }}>Loading data…</div>
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           </div>
@@ -316,12 +474,15 @@ export default function CraneAnalytics() {
 
         {!loading && (
           <>
-            {/* Stat Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
+            {/* 7 Stat Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
               <StatCard value={stats.totalLifts.toLocaleString()} label="Total Lifts" />
               <StatCard value={fmtMins(stats.totalMins)} label="Total Working Time" />
               <StatCard value={fmtMins(stats.avgMins)} label="Avg Lift Duration" />
-              <StatCard value={stats.topCrane || '—'} label="Most Active Crane" />
+              <StatCard value={stats.topCrane} label="Most Active Crane" />
+              <StatCard value={fmtMins(stats.totalIdleMins)} label="Total Idle Time" />
+              <StatCard value={`${Math.round(stats.avgDailyIdlePct)}%`} label="Avg Daily Idle" />
+              <StatCard value={stats.busiestDayFmt} label="Busiest Day" />
             </div>
 
             {noData ? (
@@ -329,115 +490,180 @@ export default function CraneAnalytics() {
                 No data found for the selected period and filters.
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1rem' }}>
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
 
-                {/* Working Time by Day */}
-                <ChartCard title="Working Time by Day" sub="Total lift time per calendar day" fullWidth>
-                  <ResponsiveContainer width="100%" height={210}>
-                    <BarChart data={workingByDay} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
-                      <XAxis
-                        dataKey="date"
-                        tick={{ fontSize: 11, fill: '#9ca3af' }}
-                        tickLine={false}
-                        axisLine={false}
-                        interval="preserveStartEnd"
-                      />
-                      <YAxis
-                        tickFormatter={v => fmtMins(v)}
-                        tick={{ fontSize: 11, fill: '#9ca3af' }}
-                        tickLine={false}
-                        axisLine={false}
-                        width={48}
-                      />
-                      <RTooltip content={<BarTip />} cursor={{ fill: '#f9fafb' }} />
-                      <Bar dataKey="mins" name="Working Time" fill={BRAND} radius={[4, 4, 0, 0]} maxBarSize={36} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </ChartCard>
+                  {/* Working Time by Day */}
+                  <ChartCard title="Working Time by Day" sub="Total lift time per calendar day" fullWidth>
+                    <ResponsiveContainer width="100%" height={210}>
+                      <BarChart data={workingByDay} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                        <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+                        <YAxis tickFormatter={v => fmtMins(v)} tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} width={48} />
+                        <RTooltip content={<BarTip />} cursor={{ fill: '#f9fafb' }} />
+                        <Bar dataKey="mins" name="Working Time" fill={BRAND} radius={[4, 4, 0, 0]} maxBarSize={36} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
 
-                {/* Idle Time by Crane */}
-                <ChartCard title="Idle Time by Crane" sub="Avg working vs idle per active day · 600 min window" fullWidth>
-                  <ResponsiveContainer width="100%" height={280}>
-                    <BarChart data={idleByCrane} margin={{ top: 4, right: 8, bottom: 64, left: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
-                      <XAxis
-                        dataKey="crane"
-                        tick={{ fontSize: 10, fill: '#9ca3af' }}
-                        tickLine={false}
-                        axisLine={false}
-                        angle={-38}
-                        textAnchor="end"
-                        interval={0}
-                      />
-                      <YAxis
-                        tickFormatter={v => fmtMins(v)}
-                        tick={{ fontSize: 11, fill: '#9ca3af' }}
-                        tickLine={false}
-                        axisLine={false}
-                        width={48}
-                        domain={[0, IDLE_WINDOW]}
-                      />
-                      <RTooltip content={<BarTip />} cursor={{ fill: '#f9fafb' }} />
-                      <Bar dataKey="working" name="Working" stackId="a" fill={BRAND} />
-                      <Bar dataKey="idle" name="Idle" stackId="a" fill="#e5e7eb" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </ChartCard>
+                  {/* Idle Time by Crane */}
+                  <ChartCard title="Idle Time by Crane" sub="Avg working vs idle per active day · 600 min window" fullWidth>
+                    <ResponsiveContainer width="100%" height={280}>
+                      <BarChart data={idleByCrane} margin={{ top: 4, right: 8, bottom: 64, left: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                        <XAxis dataKey="crane" tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false} angle={-38} textAnchor="end" interval={0} />
+                        <YAxis tickFormatter={v => fmtMins(v)} tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} width={48} domain={[0, IDLE_WINDOW]} />
+                        <RTooltip content={<BarTip />} cursor={{ fill: '#f9fafb' }} />
+                        <Bar dataKey="working" name="Working" stackId="a" fill={BRAND} />
+                        <Bar dataKey="idle" name="Idle" stackId="a" fill="#e5e7eb" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
 
-                {/* Time by Company */}
-                <ChartCard title="Time Allocation by Company" sub="Share of working time per company">
-                  <ResponsiveContainer width="100%" height={270}>
-                    <PieChart>
-                      <Pie
-                        data={byCompany}
-                        dataKey="value"
-                        nameKey="name"
-                        cx="50%"
-                        cy="42%"
-                        outerRadius={82}
-                        label={({ percent }) => (percent ?? 0) > 0.04 ? `${Math.round((percent ?? 0) * 100)}%` : ''}
-                        labelLine
-                      >
-                        {byCompany.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                      </Pie>
-                      <RTooltip content={<PieTip />} />
-                      <Legend
-                        iconType="circle"
-                        iconSize={8}
-                        wrapperStyle={{ fontSize: '0.71rem', paddingTop: '0.5rem' }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </ChartCard>
+                  {/* Idle Time by Day — NEW */}
+                  <ChartCard title="Idle Time by Day" sub="Total idle minutes across all active cranes per day" fullWidth>
+                    <ResponsiveContainer width="100%" height={210}>
+                      <BarChart data={idleByDay} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                        <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+                        <YAxis tickFormatter={v => fmtMins(v)} tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} width={48} />
+                        <RTooltip content={<BarTip />} cursor={{ fill: '#f9fafb' }} />
+                        <Bar dataKey="idle" name="Idle Time" fill="#e5e7eb" radius={[4, 4, 0, 0]} maxBarSize={36} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
 
-                {/* Time by Status */}
-                <ChartCard title="Time Allocation by Status" sub="Share of working time per lift status">
-                  <ResponsiveContainer width="100%" height={270}>
-                    <PieChart>
-                      <Pie
-                        data={byStatus}
-                        dataKey="value"
-                        nameKey="name"
-                        cx="50%"
-                        cy="42%"
-                        outerRadius={82}
-                        label={({ percent }) => (percent ?? 0) > 0.04 ? `${Math.round((percent ?? 0) * 100)}%` : ''}
-                        labelLine
-                      >
-                        {byStatus.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                      </Pie>
-                      <RTooltip content={<PieTip />} />
-                      <Legend
-                        iconType="circle"
-                        iconSize={8}
-                        wrapperStyle={{ fontSize: '0.71rem', paddingTop: '0.5rem' }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </ChartCard>
+                  {/* Time by Company — right-side legend */}
+                  <ChartCard title="Time Allocation by Company" sub="Share of working time per company">
+                    <div style={{ display: 'flex', alignItems: 'center', minHeight: '210px' }}>
+                      <div style={{ flex: '0 0 190px', height: '210px' }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie data={byCompany} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={82} innerRadius={32}>
+                              {byCompany.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                            </Pie>
+                            <RTooltip content={<PieTip />} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div style={{ flex: 1, paddingLeft: '0.75rem', overflow: 'hidden' }}>
+                        <PieLegend data={byCompany} total={companyTotal} />
+                      </div>
+                    </div>
+                  </ChartCard>
 
-              </div>
+                  {/* Time by Status — right-side legend */}
+                  <ChartCard title="Time Allocation by Status" sub="Share of working time per lift status">
+                    <div style={{ display: 'flex', alignItems: 'center', minHeight: '210px' }}>
+                      <div style={{ flex: '0 0 190px', height: '210px' }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie data={byStatus} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={82} innerRadius={32}>
+                              {byStatus.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                            </Pie>
+                            <RTooltip content={<PieTip />} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div style={{ flex: 1, paddingLeft: '0.75rem', overflow: 'hidden' }}>
+                        <PieLegend data={byStatus} total={statusTotal} />
+                      </div>
+                    </div>
+                  </ChartCard>
+
+                </div>
+
+                {/* Daily Breakdown Table */}
+                <div style={{ background: '#fff', borderRadius: '12px', padding: '1.25rem 1.25rem 0.75rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: '1rem' }}>
+                  <div style={{ fontSize: '0.73rem', fontWeight: 800, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '1rem' }}>
+                    Daily Breakdown
+                  </div>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr>
+                          {['Date', 'Crane', 'Total Lifts', 'Working', 'Idle', 'Idle %', 'First Lift', 'Last Lift'].map(col => (
+                            <th key={col} style={thBase}>{col}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dailyBreakdown.map((row, i) => (
+                          <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb' }}>
+                            <td style={tdBase}>{fmtDateLong(row.date)}</td>
+                            <td style={tdBase}>{row.crane}</td>
+                            <td style={tdBase}>{row.lifts}</td>
+                            <td style={tdBase}>{fmtMins(row.workingMins)}</td>
+                            <td style={tdBase}>{fmtMins(row.idleMins)}</td>
+                            <td style={{
+                              ...tdBase,
+                              fontWeight: 700,
+                              color: row.idlePct >= 60 ? '#991b1b' : row.idlePct >= 40 ? '#ca8a04' : '#15803d',
+                            }}>
+                              {row.idlePct}%
+                            </td>
+                            <td style={tdBase}>{fmtTime(row.firstLift)}</td>
+                            <td style={tdBase}>{fmtTime(row.lastLift)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Full Logs Table */}
+                <div style={{ background: '#fff', borderRadius: '12px', padding: '1.25rem 1.25rem 0.75rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem', marginBottom: '1rem' }}>
+                    <div style={{ fontSize: '0.73rem', fontWeight: 800, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                      All Log Entries
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#9ca3af' }}>{sortedLogs.length.toLocaleString()} records</div>
+                  </div>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr>
+                          {LOG_COLS.map(col => (
+                            <th
+                              key={col.key}
+                              style={{ ...thBase, cursor: 'pointer', userSelect: 'none' }}
+                              onClick={() => toggleSort(col.key)}
+                            >
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                                {col.label}
+                                {sortCol === col.key && (
+                                  <span style={{ color: BRAND, fontWeight: 900 }}>{sortDir === 'asc' ? ' ↑' : ' ↓'}</span>
+                                )}
+                              </span>
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sortedLogs.map((row, i) => (
+                          <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb' }}>
+                            <td style={tdBase}>{fmtDateLong(row.date)}</td>
+                            <td style={tdBase}>{row.site || '—'}</td>
+                            <td style={tdBase}>{row.crane || '—'}</td>
+                            <td style={tdBase}>{row.supervisor_name || '—'}</td>
+                            <td style={tdBase}>{row.company || '—'}</td>
+                            <td style={{ ...tdBase, maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {row.load_description || '—'}
+                            </td>
+                            <td style={tdBase}>{row.status || '—'}</td>
+                            <td style={tdBase}>{fmtTime(row.start_time)}</td>
+                            <td style={tdBase}>{fmtTime(row.end_time)}</td>
+                            <td style={tdBase}>
+                              {row.start_time && row.end_time ? fmtMins(parseMins(row.start_time, row.end_time)) : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+              </>
             )}
           </>
         )}
