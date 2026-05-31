@@ -27,7 +27,8 @@ const COLORS = [
   BRAND, '#2563eb', '#16a34a', '#ea580c',
   '#7c3aed', '#0891b2', '#be185d', '#ca8a04', '#0f766e', '#9333ea',
 ];
-const IDLE_WINDOW = 600;
+const DEFAULT_DAY_START_MINS = 480;  // 08:00
+const DEFAULT_DAY_END_MINS   = 1080; // 18:00
 
 const LOG_COLS: { key: string; label: string }[] = [
   { key: 'date', label: 'Date' },
@@ -75,6 +76,27 @@ function shortDate(d: string): string {
   const [, mo, day] = d.split('-');
   const mNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   return `${parseInt(day)} ${mNames[parseInt(mo) - 1]}`;
+}
+
+// Convert Supabase TIME string "HH:MM:SS" → minutes from midnight
+function timeStrToMins(t: string): number {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + (m || 0);
+}
+
+// Extract time-of-day minutes from a datetime string like "2024-01-15 18:30:00"
+function dtToTimeMins(dt: string | null): number {
+  if (!dt) return 0;
+  const d = new Date(dt.replace(' ', 'T'));
+  if (isNaN(d.getTime())) return 0;
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+// Format minutes-from-midnight as "HH:MM"
+function minsToTimeStr(mins: number): string {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
 function isoMonthStart(): string {
@@ -217,6 +239,8 @@ function CraneAnalyticsContent() {
   const [crane, setCrane] = useState('');
   const [lockedSiteName, setLockedSiteName] = useState<string | null>(null);
   const [siteParamResolved, setSiteParamResolved] = useState(false);
+  const [dayStartMins, setDayStartMins] = useState(DEFAULT_DAY_START_MINS);
+  const [dayEndMins, setDayEndMins] = useState(DEFAULT_DAY_END_MINS);
   const [rows, setRows] = useState<CraneLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -238,15 +262,36 @@ function CraneAnalyticsContent() {
     if (!siteId) { setSiteParamResolved(true); return; }
     supabase
       .from('crane_logs_sites')
-      .select('site_name')
+      .select('site_name, day_start_time, day_end_time')
       .eq('id', siteId)
       .single()
       .then(({ data, error: err }) => {
         console.log('[crane-analytics] crane_logs_sites lookup result:', { data, err });
         if (data?.site_name) setLockedSiteName(data.site_name);
+        if (data?.day_start_time) setDayStartMins(timeStrToMins(data.day_start_time));
+        if (data?.day_end_time) setDayEndMins(timeStrToMins(data.day_end_time));
         setSiteParamResolved(true);
       });
   }, [searchParams]);
+
+  // Fetch hours for dropdown-selected site
+  useEffect(() => {
+    if (lockedSiteName) return;
+    if (!site) {
+      setDayStartMins(DEFAULT_DAY_START_MINS);
+      setDayEndMins(DEFAULT_DAY_END_MINS);
+      return;
+    }
+    supabase
+      .from('crane_logs_sites')
+      .select('day_start_time, day_end_time')
+      .eq('site_name', site)
+      .single()
+      .then(({ data }) => {
+        setDayStartMins(data?.day_start_time ? timeStrToMins(data.day_start_time) : DEFAULT_DAY_START_MINS);
+        setDayEndMins(data?.day_end_time   ? timeStrToMins(data.day_end_time)   : DEFAULT_DAY_END_MINS);
+      });
+  }, [site, lockedSiteName]);
 
   useEffect(() => {
     if (!siteParamResolved) return;
@@ -296,6 +341,17 @@ function CraneAnalyticsContent() {
     return map;
   }, [filtered]);
 
+  // Per-crane, per-day latest lift end time in minutes-from-midnight (for overtime detection)
+  const craneDayMaxEnd = useMemo(() => {
+    const map: Record<string, Record<string, number>> = {};
+    for (const r of filtered) {
+      if (!map[r.crane]) map[r.crane] = {};
+      const endMins = dtToTimeMins(r.end_time);
+      map[r.crane][r.date] = Math.max(map[r.crane][r.date] ?? 0, endMins);
+    }
+    return map;
+  }, [filtered]);
+
   const stats = useMemo(() => {
     let totalMins = 0;
     let totalIdleMins = 0;
@@ -310,11 +366,13 @@ function CraneAnalyticsContent() {
       craneCounts[r.crane] = (craneCounts[r.crane] ?? 0) + 1;
       dayMins[r.date] = (dayMins[r.date] ?? 0) + m;
     }
-    for (const days of Object.values(craneDay)) {
-      for (const working of Object.values(days)) {
-        const idle = Math.max(0, IDLE_WINDOW - working);
+    for (const [craneName, days] of Object.entries(craneDay)) {
+      for (const [date, working] of Object.entries(days)) {
+        const maxEnd = craneDayMaxEnd[craneName]?.[date] ?? dayEndMins;
+        const window = Math.max(dayEndMins, maxEnd) - dayStartMins;
+        const idle = Math.max(0, window - working);
         totalIdleMins += idle;
-        totalIdlePctSum += (idle / IDLE_WINDOW) * 100;
+        totalIdlePctSum += window > 0 ? (idle / window) * 100 : 0;
         totalCraneDayPairs++;
       }
     }
@@ -334,7 +392,7 @@ function CraneAnalyticsContent() {
       avgDailyIdlePct,
       busiestDayFmt: busiestDay ? shortDate(busiestDay) : '—',
     };
-  }, [filtered, craneDay]);
+  }, [filtered, craneDay, craneDayMaxEnd, dayStartMins, dayEndMins]);
 
   const workingByDay = useMemo(() => {
     const map: Record<string, number> = {};
@@ -348,26 +406,33 @@ function CraneAnalyticsContent() {
 
   const idleByDay = useMemo(() => {
     const map: Record<string, number> = {};
-    for (const days of Object.values(craneDay)) {
+    for (const [craneName, days] of Object.entries(craneDay)) {
       for (const [date, working] of Object.entries(days)) {
-        map[date] = (map[date] ?? 0) + Math.max(0, IDLE_WINDOW - working);
+        const maxEnd = craneDayMaxEnd[craneName]?.[date] ?? dayEndMins;
+        const window = Math.max(dayEndMins, maxEnd) - dayStartMins;
+        map[date] = (map[date] ?? 0) + Math.max(0, window - working);
       }
     }
     return Object.entries(map)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([date, idle]) => ({ date: shortDate(date), idle: Math.round(idle) }));
-  }, [craneDay]);
+  }, [craneDay, craneDayMaxEnd, dayStartMins, dayEndMins]);
 
   const idleByCrane = useMemo(() => {
     return Object.entries(craneDay)
       .map(([craneName, days]) => {
-        const vals = Object.values(days);
-        const avgWorking = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
-        return { crane: craneName, working: avgWorking, idle: Math.max(0, IDLE_WINDOW - avgWorking) };
+        const vals = Object.entries(days).map(([date, working]) => {
+          const maxEnd = craneDayMaxEnd[craneName]?.[date] ?? dayEndMins;
+          const window = Math.max(dayEndMins, maxEnd) - dayStartMins;
+          return { working, window };
+        });
+        const avgWorking = Math.round(vals.reduce((a, b) => a + b.working, 0) / vals.length);
+        const avgWindow  = Math.round(vals.reduce((a, b) => a + b.window,  0) / vals.length);
+        return { crane: craneName, working: avgWorking, idle: Math.max(0, avgWindow - avgWorking), window: avgWindow };
       })
       .sort((a, b) => b.idle - a.idle)
       .slice(0, 16);
-  }, [craneDay]);
+  }, [craneDay, craneDayMaxEnd, dayStartMins, dayEndMins]);
 
   const byCompany = useMemo(() => {
     const map: Record<string, number> = {};
@@ -411,10 +476,12 @@ function CraneAnalyticsContent() {
       .sort((a, b) => a.date.localeCompare(b.date) || a.crane.localeCompare(b.crane))
       .map(row => {
         const w = Math.round(row.workingMins);
-        const idle = Math.max(0, IDLE_WINDOW - w);
-        return { ...row, workingMins: w, idleMins: idle, idlePct: Math.round((idle / IDLE_WINDOW) * 100) };
+        const maxEnd = craneDayMaxEnd[row.crane]?.[row.date] ?? dayEndMins;
+        const window = Math.max(dayEndMins, maxEnd) - dayStartMins;
+        const idle = Math.max(0, window - w);
+        return { ...row, workingMins: w, idleMins: idle, idlePct: window > 0 ? Math.round((idle / window) * 100) : 0 };
       });
-  }, [filtered]);
+  }, [filtered, craneDayMaxEnd, dayStartMins, dayEndMins]);
 
   const sortedLogs = useMemo(() => {
     const base = rows.filter(r => (!effectiveSite || r.site === effectiveSite) && (!crane || r.crane === crane));
@@ -789,12 +856,12 @@ function CraneAnalyticsContent() {
 
                   {/* Idle Time by Crane */}
                   <div ref={chartIdleByCrane} style={{ gridColumn: '1 / -1' }}>
-                    <ChartCard title="Idle Time by Crane" sub="Avg working vs idle per active day · 600 min window">
+                    <ChartCard title="Idle Time by Crane" sub={`Avg working vs idle per active day · ${dayEndMins - dayStartMins} min window (${minsToTimeStr(dayStartMins)}–${minsToTimeStr(dayEndMins)})`}>
                       <ResponsiveContainer width="100%" height={280}>
                         <BarChart data={idleByCrane} margin={{ top: 4, right: 8, bottom: 64, left: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                           <XAxis dataKey="crane" tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false} angle={-38} textAnchor="end" interval={0} />
-                          <YAxis tickFormatter={v => fmtMins(v)} tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} width={48} domain={[0, IDLE_WINDOW]} />
+                          <YAxis tickFormatter={v => fmtMins(v)} tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} width={48} domain={[0, 'auto']} />
                           <RTooltip content={<BarTip />} cursor={{ fill: '#f9fafb' }} />
                           <Bar dataKey="working" name="Working" stackId="a" fill={BRAND} />
                           <Bar dataKey="idle" name="Idle" stackId="a" fill="#3b82f6" radius={[4, 4, 0, 0]} />
