@@ -28,9 +28,11 @@ const MONTHS = [
 ];
 const IDLE_WINDOW = 600; // 10-hour crane day in minutes
 
-function parseMins(start: string, end: string): number {
+function parseMins(start: string | null, end: string | null): number {
+  if (!start || !end) return 0;
   const s = new Date(start.replace(' ', 'T'));
   const e = new Date(end.replace(' ', 'T'));
+  if (isNaN(s.getTime()) || isNaN(e.getTime())) return 0;
   return Math.max(0, (e.getTime() - s.getTime()) / 60000);
 }
 
@@ -173,7 +175,7 @@ export default function CraneAnalytics() {
   }, [cranes, crane]);
 
   const filtered = useMemo(() => {
-    let d = rows;
+    let d = rows.filter(r => r.start_time && r.end_time);
     if (site) d = d.filter(r => r.site === site);
     if (crane) d = d.filter(r => r.crane === crane);
     return d;
