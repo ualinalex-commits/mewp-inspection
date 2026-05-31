@@ -226,7 +226,7 @@ function CraneAnalyticsContent() {
   const effectiveSite = lockedSiteName ?? site;
 
   useEffect(() => {
-    const siteId = searchParams.get('siteId');
+    const siteId = searchParams?.get('siteId');
     if (!siteId) { setSiteParamResolved(true); return; }
     supabase
       .from('crane_logs_sites')
