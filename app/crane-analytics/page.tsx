@@ -372,7 +372,8 @@ function CraneAnalyticsContent() {
   const byCompany = useMemo(() => {
     const map: Record<string, number> = {};
     for (const r of filtered) {
-      const k = r.company?.trim() || 'Unknown';
+      const k = r.company?.trim();
+      if (!k) continue;
       map[k] = (map[k] ?? 0) + parseMins(r.start_time, r.end_time);
     }
     return Object.entries(map)
