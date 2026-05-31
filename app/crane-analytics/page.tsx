@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
@@ -209,15 +210,32 @@ const tdBase: React.CSSProperties = {
 };
 
 export default function CraneAnalytics() {
+  const searchParams = useSearchParams();
   const [startDate, setStartDate] = useState(isoMonthStart());
   const [endDate, setEndDate] = useState(isoMonthEnd());
   const [site, setSite] = useState('');
   const [crane, setCrane] = useState('');
+  const [lockedSiteName, setLockedSiteName] = useState<string | null>(null);
   const [rows, setRows] = useState<CraneLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sortCol, setSortCol] = useState('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+  const effectiveSite = lockedSiteName ?? site;
+
+  useEffect(() => {
+    const siteId = searchParams.get('siteId');
+    if (!siteId) return;
+    supabase
+      .from('crane_logs_sites')
+      .select('name')
+      .eq('id', siteId)
+      .single()
+      .then(({ data }) => {
+        if (data?.name) setLockedSiteName(data.name);
+      });
+  }, [searchParams]);
 
   useEffect(() => {
     setSite('');
@@ -242,9 +260,9 @@ export default function CraneAnalytics() {
   );
 
   const cranes = useMemo(() => {
-    const base = site ? rows.filter(r => r.site === site) : rows;
+    const base = effectiveSite ? rows.filter(r => r.site === effectiveSite) : rows;
     return Array.from(new Set(base.map(r => r.crane).filter(Boolean))).sort();
-  }, [rows, site]);
+  }, [rows, effectiveSite]);
 
   useEffect(() => {
     if (crane && !cranes.includes(crane)) setCrane('');
@@ -252,10 +270,10 @@ export default function CraneAnalytics() {
 
   const filtered = useMemo(() => {
     let d = rows.filter(r => r.start_time && r.end_time);
-    if (site) d = d.filter(r => r.site === site);
+    if (effectiveSite) d = d.filter(r => r.site === effectiveSite);
     if (crane) d = d.filter(r => r.crane === crane);
     return d;
-  }, [rows, site, crane]);
+  }, [rows, effectiveSite, crane]);
 
   // Per-crane, per-day working minutes map
   const craneDay = useMemo(() => {
@@ -387,7 +405,7 @@ export default function CraneAnalytics() {
   }, [filtered]);
 
   const sortedLogs = useMemo(() => {
-    const base = rows.filter(r => (!site || r.site === site) && (!crane || r.crane === crane));
+    const base = rows.filter(r => (!effectiveSite || r.site === effectiveSite) && (!crane || r.crane === crane));
     return [...base].sort((a, b) => {
       let va: string | number = '';
       let vb: string | number = '';
@@ -442,13 +460,24 @@ export default function CraneAnalytics() {
             <label style={labelStyle}>End Date</label>
             <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={inputStyle} />
           </div>
-          <div style={{ flex: '2 1 200px', minWidth: '150px' }}>
-            <label style={labelStyle}>Site</label>
-            <select value={site} onChange={e => setSite(e.target.value)} style={selectStyle}>
-              <option value="">All Sites</option>
-              {sites.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
+          {!lockedSiteName && (
+            <div style={{ flex: '2 1 200px', minWidth: '150px' }}>
+              <label style={labelStyle}>Site</label>
+              <select value={site} onChange={e => setSite(e.target.value)} style={selectStyle}>
+                <option value="">All Sites</option>
+                {sites.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          )}
+          {lockedSiteName && (
+            <div style={{ flex: '2 1 200px', minWidth: '150px' }}>
+              <label style={labelStyle}>Site</label>
+              <div style={{ ...inputStyle, background: '#f3f4f6', color: '#374151', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: BRAND, flexShrink: 0 }} />
+                {lockedSiteName}
+              </div>
+            </div>
+          )}
           <div style={{ flex: '1 1 130px', minWidth: '110px' }}>
             <label style={labelStyle}>Crane</label>
             <select value={crane} onChange={e => setCrane(e.target.value)} style={selectStyle}>
