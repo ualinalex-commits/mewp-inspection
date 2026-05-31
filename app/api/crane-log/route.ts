@@ -11,37 +11,27 @@ export async function POST(req: NextRequest) {
   }
 
   const {
-    summary_key,
     date,
     site,
     crane,
     supervisor_name,
     company,
     load_description,
+    status,
     start_time,
     end_time,
-    duration_minutes,
-    start_minutes,
-    end_minutes,
-    day_start,
-    day_end,
   } = body;
 
   const { error } = await supabase.from("crane_logs").insert({
-    summary_key,
     date,
     site,
     crane,
     supervisor_name,
     company,
     load_description,
+    status,
     start_time,
     end_time,
-    duration_minutes,
-    start_minutes,
-    end_minutes,
-    day_start,
-    day_end,
   });
 
   if (error) {
