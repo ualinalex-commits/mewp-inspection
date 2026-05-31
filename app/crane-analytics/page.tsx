@@ -442,10 +442,13 @@ function CraneAnalyticsContent() {
       const { jsPDF } = await import('jspdf');
       const html2canvas = (await import('html2canvas')).default;
 
-      const doc = new jsPDF('p', 'mm', 'a4');
+      // Entire PDF in A4 landscape (297mm × 210mm)
+      const doc = new jsPDF('l', 'mm', 'a4');
       const margin = 14;
+      const footerH = 10; // reserved at bottom for page numbers
       const getW = () => doc.internal.pageSize.getWidth();
       const getH = () => doc.internal.pageSize.getHeight();
+      const maxY = () => getH() - margin - footerH;
       let y = margin;
 
       const drawSep = () => {
@@ -467,6 +470,9 @@ function CraneAnalyticsContent() {
         return lineY + 3.5;
       };
 
+      const siteName = effectiveSite || 'All Sites';
+      const contentW = getW() - margin * 2; // 269mm in A4 landscape
+
       // Title
       doc.setFontSize(22);
       doc.setTextColor('#d02a35');
@@ -474,19 +480,21 @@ function CraneAnalyticsContent() {
       doc.text('Crane Log Analytics Report', margin, y);
       y += 8;
 
-      // Site + date
+      // Header line: Site Name | Crane: X (if selected) | Period: …
       doc.setFontSize(10);
       doc.setTextColor('#374151');
       doc.setFont('helvetica', 'normal');
-      const siteName = effectiveSite || 'All Sites';
-      doc.text(`Site: ${siteName}`, margin, y);
-      y += 5;
-      doc.text(`Period: ${fmtDateLong(startDate)} — ${fmtDateLong(endDate)}`, margin, y);
+      const headerParts = [
+        siteName,
+        ...(crane ? [`Crane: ${crane}`] : []),
+        `Period: ${fmtDateLong(startDate)} — ${fmtDateLong(endDate)}`,
+      ];
+      doc.text(headerParts.join('  |  '), margin, y);
       y += 8;
 
       drawSep(); y += 6;
 
-      // Stats
+      // Stats — 7 cards across the full landscape width
       doc.setFontSize(7.5);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor('#6b7280');
@@ -503,26 +511,22 @@ function CraneAnalyticsContent() {
         { label: 'Busiest Day', value: stats.busiestDayFmt },
       ];
 
-      const contentW = getW() - margin * 2;
-      const statCols = 4;
-      const statColW = contentW / statCols;
-
+      // All 7 in one row — 269 / 7 ≈ 38.4mm each
+      const statColW = contentW / statItems.length;
       for (let i = 0; i < statItems.length; i++) {
-        const col = i % statCols;
-        const row = Math.floor(i / statCols);
-        const sx = margin + col * statColW;
-        const sy = y + row * 13;
-        doc.setFontSize(13);
+        const sx = margin + i * statColW;
+        doc.setFontSize(12);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor('#111827');
-        doc.text(statItems[i].value, sx, sy);
+        const val = statItems[i].value;
+        doc.text(val.length > 10 ? val.substring(0, 9) + '…' : val, sx, y);
         doc.setFontSize(6.5);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor('#6b7280');
-        doc.text(statItems[i].label.toUpperCase(), sx, sy + 4);
+        doc.text(statItems[i].label.toUpperCase(), sx, y + 4.5);
       }
 
-      y += Math.ceil(statItems.length / statCols) * 13 + 8;
+      y += 14;
       drawSep(); y += 8;
 
       // Charts
@@ -538,10 +542,9 @@ function CraneAnalyticsContent() {
         if (!ref.current) continue;
         const canvas = await html2canvas(ref.current, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
         const imgData = canvas.toDataURL('image/png');
-        const cW = getW() - margin * 2;
-        const imgH = cW * (canvas.height / canvas.width);
-        if (y + imgH > getH() - margin) { doc.addPage(); y = margin; }
-        doc.addImage(imgData, 'PNG', margin, y, cW, imgH);
+        const imgH = contentW * (canvas.height / canvas.width);
+        if (y + imgH > maxY()) { doc.addPage(); y = margin; }
+        doc.addImage(imgData, 'PNG', margin, y, contentW, imgH);
         y += imgH + 6;
       }
 
@@ -554,33 +557,34 @@ function CraneAnalyticsContent() {
       doc.text('Daily Breakdown', margin, y);
       y += 9;
 
-      const dbHeaders = ['Date', 'Crane', 'Lifts', 'Working', 'Idle', 'Idle %', 'First Lift', 'Last Lift'];
-      const dbColW    = [30,     35,      15,       22,        22,     18,       22,           18];
+      // Wider columns now that we're in landscape — sum = 269mm
+      const dbHeaders = ['Date',  'Crane', 'Lifts', 'Working', 'Idle', 'Idle %', 'First Lift', 'Last Lift'];
+      const dbColW    = [40,      62,      20,       33,        28,     27,       30,            29];
 
       y = drawTblHeader(dbHeaders, dbColW, margin, y);
-      doc.setFontSize(7.5);
+      doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor('#374151');
 
       for (const row of dailyBreakdown) {
-        if (y > getH() - margin - 8) {
+        if (y > maxY()) {
           doc.addPage(); y = margin;
           y = drawTblHeader(dbHeaders, dbColW, margin, y);
-          doc.setFontSize(7.5); doc.setFont('helvetica', 'normal'); doc.setTextColor('#374151');
+          doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor('#374151');
         }
         let x = margin;
         [fmtDateLong(row.date), row.crane, String(row.lifts), fmtMins(row.workingMins),
           fmtMins(row.idleMins), `${row.idlePct}%`, fmtTime(row.firstLift), fmtTime(row.lastLift)]
           .forEach((cell, i) => {
-            const max = Math.floor(dbColW[i] / 1.8);
+            const max = Math.floor(dbColW[i] / 1.9);
             doc.text(cell.length > max ? cell.substring(0, max - 1) + '…' : cell, x, y);
             x += dbColW[i];
           });
-        y += 5;
+        y += 6;
       }
 
-      // Full logs table — landscape
-      doc.addPage([297, 210]);
+      // Full logs table — same landscape orientation, no orientation switch needed
+      doc.addPage();
       y = margin;
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
@@ -592,19 +596,20 @@ function CraneAnalyticsContent() {
       doc.text(`${sortedLogs.length.toLocaleString()} records`, margin + 52, y + 0.5);
       y += 9;
 
+      // 10 columns across 269mm — sum = 269mm
       const logHeaders = ['Date', 'Site', 'Crane', 'Supervisor', 'Company', 'Load Description', 'Status', 'Start', 'End', 'Duration'];
-      const logColW    = [26,     32,     26,       28,           28,        48,                  22,       19,     19,    21];
+      const logColW    = [26,     32,     25,       27,           27,        55,                  21,       19,     18,    19];
 
       y = drawTblHeader(logHeaders, logColW, margin, y);
-      doc.setFontSize(7);
+      doc.setFontSize(6.5);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor('#374151');
 
       for (const row of sortedLogs) {
-        if (y > getH() - margin - 8) {
-          doc.addPage([297, 210]); y = margin;
+        if (y > maxY()) {
+          doc.addPage(); y = margin;
           y = drawTblHeader(logHeaders, logColW, margin, y);
-          doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor('#374151');
+          doc.setFontSize(6.5); doc.setFont('helvetica', 'normal'); doc.setTextColor('#374151');
         }
         let x = margin;
         const dur = row.start_time && row.end_time ? fmtMins(parseMins(row.start_time, row.end_time)) : '—';
@@ -612,21 +617,34 @@ function CraneAnalyticsContent() {
           row.company || '—', row.load_description || '—', row.status || '—',
           fmtTime(row.start_time), fmtTime(row.end_time), dur]
           .forEach((cell, i) => {
-            const max = Math.floor(logColW[i] / 1.65);
+            const max = Math.floor(logColW[i] / 1.55);
             doc.text(cell.length > max ? cell.substring(0, max - 1) + '…' : cell, x, y);
             x += logColW[i];
           });
-        y += 4.5;
+        y += 5;
+      }
+
+      // Page numbers — stamp every page after all content is written
+      const totalPages = doc.getNumberOfPages();
+      for (let p = 1; p <= totalPages; p++) {
+        doc.setPage(p);
+        doc.setFontSize(7);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor('#9ca3af');
+        const pageText = `Page ${p} of ${totalPages}`;
+        const textW = doc.getTextWidth(pageText);
+        doc.text(pageText, (getW() - textW) / 2, getH() - 5);
       }
 
       const safeSite = (effectiveSite || 'all-sites').toLowerCase().replace(/[^a-z0-9]+/g, '-');
-      doc.save(`crane-report-${safeSite}-${startDate}-${endDate}.pdf`);
+      const safeCrane = crane ? `-${crane.toLowerCase().replace(/[^a-z0-9]+/g, '-')}` : '';
+      doc.save(`crane-report-${safeSite}${safeCrane}-${startDate}-${endDate}.pdf`);
     } catch (err) {
       console.error('PDF generation failed:', err);
     } finally {
       setPdfLoading(false);
     }
-  }, [stats, dailyBreakdown, sortedLogs, effectiveSite, startDate, endDate]);
+  }, [stats, dailyBreakdown, sortedLogs, effectiveSite, crane, startDate, endDate]);
 
   function toggleSort(col: string) {
     if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
