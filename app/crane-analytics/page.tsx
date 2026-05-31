@@ -124,9 +124,9 @@ function StatCard({ value, label }: { value: string; label: string }) {
   );
 }
 
-function ChartCard({ title, sub, children, fullWidth }: { title: string; sub?: string; children: React.ReactNode; fullWidth?: boolean }) {
+function ChartCard({ title, sub, children, fullWidth, style }: { title: string; sub?: string; children: React.ReactNode; fullWidth?: boolean; style?: React.CSSProperties }) {
   return (
-    <div style={{ background: '#fff', borderRadius: '12px', padding: '1.25rem 1.25rem 1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', gridColumn: fullWidth ? '1 / -1' : undefined }}>
+    <div style={{ background: '#fff', borderRadius: '12px', padding: '1.25rem 1.25rem 1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', gridColumn: fullWidth ? '1 / -1' : undefined, ...style }}>
       <div style={{ fontSize: '0.73rem', fontWeight: 800, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{title}</div>
       <div style={{ fontSize: '0.68rem', color: '#9ca3af', marginTop: '0.1rem', marginBottom: '1.1rem' }}>{sub ?? ' '}</div>
       {children}
@@ -140,7 +140,7 @@ function PieLegend({ data, total }: { data: { name: string; value: number }[]; t
       {data.map((item, i) => (
         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.72rem' }}>
           <div style={{ width: 8, height: 8, borderRadius: '50%', background: COLORS[i % COLORS.length], flexShrink: 0 }} />
-          <span style={{ flex: 1, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
+          <span style={{ flex: 1, color: '#374151', wordBreak: 'break-word' }}>{item.name}</span>
           <span style={{ color: '#6b7280', flexShrink: 0, marginLeft: '0.25rem' }}>{fmtMins(item.value)}</span>
           <span style={{ color: '#9ca3af', flexShrink: 0, minWidth: '30px', textAlign: 'right' }}>
             {total > 0 ? `${Math.round((item.value / total) * 100)}%` : '0%'}
@@ -421,7 +421,7 @@ export default function CraneAnalytics() {
 
       {/* Header */}
       <div style={{ background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '0.9rem 1.5rem' }}>
-        <div style={{ maxWidth: '1160px', margin: '0 auto', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <div style={{ maxWidth: '1392px', margin: '0 auto', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <div style={{ width: '8px', height: '28px', background: BRAND, borderRadius: '4px', flexShrink: 0 }} />
           <div>
             <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#111827', lineHeight: 1 }}>Crane Log Analytics</div>
@@ -430,7 +430,7 @@ export default function CraneAnalytics() {
         </div>
       </div>
 
-      <div style={{ maxWidth: '1160px', margin: '0 auto', padding: '1.25rem 1rem' }}>
+      <div style={{ maxWidth: '1392px', margin: '0 auto', padding: '1.25rem 1rem' }}>
 
         {/* Filters */}
         <div style={{ background: '#fff', borderRadius: '12px', padding: '1rem 1.25rem', marginBottom: '1.25rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'flex-end' }}>
@@ -515,7 +515,7 @@ export default function CraneAnalytics() {
                         <YAxis tickFormatter={v => fmtMins(v)} tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} width={48} domain={[0, IDLE_WINDOW]} />
                         <RTooltip content={<BarTip />} cursor={{ fill: '#f9fafb' }} />
                         <Bar dataKey="working" name="Working" stackId="a" fill={BRAND} />
-                        <Bar dataKey="idle" name="Idle" stackId="a" fill="#e5e7eb" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="idle" name="Idle" stackId="a" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </ChartCard>
@@ -534,7 +534,7 @@ export default function CraneAnalytics() {
                   </ChartCard>
 
                   {/* Time by Company — right-side legend */}
-                  <ChartCard title="Time Allocation by Company" sub="Share of working time per company">
+                  <ChartCard title="Time Allocation by Company" sub="Share of working time per company" style={{ minWidth: '520px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', minHeight: '210px' }}>
                       <div style={{ flex: '0 0 190px', height: '210px' }}>
                         <ResponsiveContainer width="100%" height="100%">
@@ -546,14 +546,14 @@ export default function CraneAnalytics() {
                           </PieChart>
                         </ResponsiveContainer>
                       </div>
-                      <div style={{ flex: 1, paddingLeft: '0.75rem', overflow: 'hidden' }}>
+                      <div style={{ flex: 1, paddingLeft: '0.75rem', minWidth: 0 }}>
                         <PieLegend data={byCompany} total={companyTotal} />
                       </div>
                     </div>
                   </ChartCard>
 
                   {/* Time by Status — right-side legend */}
-                  <ChartCard title="Time Allocation by Status" sub="Share of working time per lift status">
+                  <ChartCard title="Time Allocation by Status" sub="Share of working time per lift status" style={{ minWidth: '520px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', minHeight: '210px' }}>
                       <div style={{ flex: '0 0 190px', height: '210px' }}>
                         <ResponsiveContainer width="100%" height="100%">
@@ -565,7 +565,7 @@ export default function CraneAnalytics() {
                           </PieChart>
                         </ResponsiveContainer>
                       </div>
-                      <div style={{ flex: 1, paddingLeft: '0.75rem', overflow: 'hidden' }}>
+                      <div style={{ flex: 1, paddingLeft: '0.75rem', minWidth: 0 }}>
                         <PieLegend data={byStatus} total={statusTotal} />
                       </div>
                     </div>
