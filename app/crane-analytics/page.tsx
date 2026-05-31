@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, Suspense } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import {
@@ -222,6 +222,13 @@ function CraneAnalyticsContent() {
   const [error, setError] = useState<string | null>(null);
   const [sortCol, setSortCol] = useState('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  const chartWorkingByDay = useRef<HTMLDivElement>(null);
+  const chartIdleByCrane = useRef<HTMLDivElement>(null);
+  const chartIdleByDay = useRef<HTMLDivElement>(null);
+  const chartByCompany = useRef<HTMLDivElement>(null);
+  const chartByStatus = useRef<HTMLDivElement>(null);
 
   const effectiveSite = lockedSiteName ?? site;
 
@@ -429,6 +436,198 @@ function CraneAnalyticsContent() {
     });
   }, [rows, effectiveSite, crane, sortCol, sortDir]);
 
+  const downloadPDF = useCallback(async () => {
+    setPdfLoading(true);
+    try {
+      const { jsPDF } = await import('jspdf');
+      const html2canvas = (await import('html2canvas')).default;
+
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const margin = 14;
+      const getW = () => doc.internal.pageSize.getWidth();
+      const getH = () => doc.internal.pageSize.getHeight();
+      let y = margin;
+
+      const drawSep = () => {
+        doc.setDrawColor('#e5e7eb');
+        doc.setLineWidth(0.4);
+        doc.line(margin, y, getW() - margin, y);
+      };
+
+      const drawTblHeader = (headers: string[], colWidths: number[], startX: number, startY: number) => {
+        doc.setFontSize(7);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor('#6b7280');
+        let x = startX;
+        headers.forEach((h, i) => { doc.text(h.toUpperCase(), x, startY); x += colWidths[i]; });
+        const lineY = startY + 2.5;
+        doc.setDrawColor('#e5e7eb');
+        doc.setLineWidth(0.3);
+        doc.line(startX, lineY, startX + colWidths.reduce((a, b) => a + b, 0), lineY);
+        return lineY + 3.5;
+      };
+
+      // Title
+      doc.setFontSize(22);
+      doc.setTextColor('#d02a35');
+      doc.setFont('helvetica', 'bold');
+      doc.text('Crane Log Analytics Report', margin, y);
+      y += 8;
+
+      // Site + date
+      doc.setFontSize(10);
+      doc.setTextColor('#374151');
+      doc.setFont('helvetica', 'normal');
+      const siteName = effectiveSite || 'All Sites';
+      doc.text(`Site: ${siteName}`, margin, y);
+      y += 5;
+      doc.text(`Period: ${fmtDateLong(startDate)} — ${fmtDateLong(endDate)}`, margin, y);
+      y += 8;
+
+      drawSep(); y += 6;
+
+      // Stats
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor('#6b7280');
+      doc.text('STATISTICS', margin, y);
+      y += 5;
+
+      const statItems = [
+        { label: 'Total Lifts', value: stats.totalLifts.toLocaleString() },
+        { label: 'Total Working Time', value: fmtMins(stats.totalMins) },
+        { label: 'Avg Lift Duration', value: fmtMins(stats.avgMins) },
+        { label: 'Most Active Crane', value: stats.topCrane },
+        { label: 'Total Idle Time', value: fmtMins(stats.totalIdleMins) },
+        { label: 'Avg Daily Idle', value: `${Math.round(stats.avgDailyIdlePct)}%` },
+        { label: 'Busiest Day', value: stats.busiestDayFmt },
+      ];
+
+      const contentW = getW() - margin * 2;
+      const statCols = 4;
+      const statColW = contentW / statCols;
+
+      for (let i = 0; i < statItems.length; i++) {
+        const col = i % statCols;
+        const row = Math.floor(i / statCols);
+        const sx = margin + col * statColW;
+        const sy = y + row * 13;
+        doc.setFontSize(13);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor('#111827');
+        doc.text(statItems[i].value, sx, sy);
+        doc.setFontSize(6.5);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor('#6b7280');
+        doc.text(statItems[i].label.toUpperCase(), sx, sy + 4);
+      }
+
+      y += Math.ceil(statItems.length / statCols) * 13 + 8;
+      drawSep(); y += 8;
+
+      // Charts
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor('#6b7280');
+      doc.text('CHARTS', margin, y);
+      y += 5;
+
+      const chartRefs = [chartWorkingByDay, chartIdleByCrane, chartIdleByDay, chartByCompany, chartByStatus];
+
+      for (const ref of chartRefs) {
+        if (!ref.current) continue;
+        const canvas = await html2canvas(ref.current, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
+        const imgData = canvas.toDataURL('image/png');
+        const cW = getW() - margin * 2;
+        const imgH = cW * (canvas.height / canvas.width);
+        if (y + imgH > getH() - margin) { doc.addPage(); y = margin; }
+        doc.addImage(imgData, 'PNG', margin, y, cW, imgH);
+        y += imgH + 6;
+      }
+
+      // Daily breakdown table
+      doc.addPage();
+      y = margin;
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor('#d02a35');
+      doc.text('Daily Breakdown', margin, y);
+      y += 9;
+
+      const dbHeaders = ['Date', 'Crane', 'Lifts', 'Working', 'Idle', 'Idle %', 'First Lift', 'Last Lift'];
+      const dbColW    = [30,     35,      15,       22,        22,     18,       22,           18];
+
+      y = drawTblHeader(dbHeaders, dbColW, margin, y);
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor('#374151');
+
+      for (const row of dailyBreakdown) {
+        if (y > getH() - margin - 8) {
+          doc.addPage(); y = margin;
+          y = drawTblHeader(dbHeaders, dbColW, margin, y);
+          doc.setFontSize(7.5); doc.setFont('helvetica', 'normal'); doc.setTextColor('#374151');
+        }
+        let x = margin;
+        [fmtDateLong(row.date), row.crane, String(row.lifts), fmtMins(row.workingMins),
+          fmtMins(row.idleMins), `${row.idlePct}%`, fmtTime(row.firstLift), fmtTime(row.lastLift)]
+          .forEach((cell, i) => {
+            const max = Math.floor(dbColW[i] / 1.8);
+            doc.text(cell.length > max ? cell.substring(0, max - 1) + '…' : cell, x, y);
+            x += dbColW[i];
+          });
+        y += 5;
+      }
+
+      // Full logs table — landscape
+      doc.addPage([297, 210]);
+      y = margin;
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor('#d02a35');
+      doc.text('All Log Entries', margin, y);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor('#6b7280');
+      doc.text(`${sortedLogs.length.toLocaleString()} records`, margin + 52, y + 0.5);
+      y += 9;
+
+      const logHeaders = ['Date', 'Site', 'Crane', 'Supervisor', 'Company', 'Load Description', 'Status', 'Start', 'End', 'Duration'];
+      const logColW    = [26,     32,     26,       28,           28,        48,                  22,       19,     19,    21];
+
+      y = drawTblHeader(logHeaders, logColW, margin, y);
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor('#374151');
+
+      for (const row of sortedLogs) {
+        if (y > getH() - margin - 8) {
+          doc.addPage([297, 210]); y = margin;
+          y = drawTblHeader(logHeaders, logColW, margin, y);
+          doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor('#374151');
+        }
+        let x = margin;
+        const dur = row.start_time && row.end_time ? fmtMins(parseMins(row.start_time, row.end_time)) : '—';
+        [fmtDateLong(row.date), row.site || '—', row.crane || '—', row.supervisor_name || '—',
+          row.company || '—', row.load_description || '—', row.status || '—',
+          fmtTime(row.start_time), fmtTime(row.end_time), dur]
+          .forEach((cell, i) => {
+            const max = Math.floor(logColW[i] / 1.65);
+            doc.text(cell.length > max ? cell.substring(0, max - 1) + '…' : cell, x, y);
+            x += logColW[i];
+          });
+        y += 4.5;
+      }
+
+      const safeSite = (effectiveSite || 'all-sites').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      doc.save(`crane-report-${safeSite}-${startDate}-${endDate}.pdf`);
+    } catch (err) {
+      console.error('PDF generation failed:', err);
+    } finally {
+      setPdfLoading(false);
+    }
+  }, [stats, dailyBreakdown, sortedLogs, effectiveSite, startDate, endDate]);
+
   function toggleSort(col: string) {
     if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     else { setSortCol(col); setSortDir('asc'); }
@@ -445,10 +644,37 @@ function CraneAnalyticsContent() {
       <div style={{ background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '0.9rem 1.5rem' }}>
         <div style={{ maxWidth: '1392px', margin: '0 auto', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <div style={{ width: '8px', height: '28px', background: BRAND, borderRadius: '4px', flexShrink: 0 }} />
-          <div>
+          <div style={{ flex: 1 }}>
             <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#111827', lineHeight: 1 }}>Crane Log Analytics</div>
             <div style={{ fontSize: '0.73rem', color: '#9ca3af', marginTop: '0.15rem' }}>ProLifting Software</div>
+            {(lockedSiteName || site) && (
+              <div style={{ fontSize: '0.92rem', fontWeight: 600, color: '#374151', marginTop: '0.3rem' }}>
+                {lockedSiteName || site}
+              </div>
+            )}
           </div>
+          <button
+            onClick={downloadPDF}
+            disabled={pdfLoading || loading}
+            style={{
+              background: BRAND,
+              color: '#fff',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '0.55rem 1rem',
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              cursor: pdfLoading || loading ? 'not-allowed' : 'pointer',
+              opacity: pdfLoading || loading ? 0.6 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              flexShrink: 0,
+              fontFamily: 'system-ui, sans-serif',
+            }}
+          >
+            {pdfLoading ? 'Generating…' : '↓ Download PDF'}
+          </button>
         </div>
       </div>
 
@@ -518,44 +744,50 @@ function CraneAnalyticsContent() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
 
                   {/* Working Time by Day */}
-                  <ChartCard title="Working Time by Day" sub="Total lift time per calendar day" fullWidth>
-                    <ResponsiveContainer width="100%" height={210}>
-                      <BarChart data={workingByDay} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
-                        <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-                        <YAxis tickFormatter={v => fmtMins(v)} tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} width={48} />
-                        <RTooltip content={<BarTip />} cursor={{ fill: '#f9fafb' }} />
-                        <Bar dataKey="mins" name="Working Time" fill={BRAND} radius={[4, 4, 0, 0]} maxBarSize={36} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </ChartCard>
+                  <div ref={chartWorkingByDay} style={{ gridColumn: '1 / -1' }}>
+                    <ChartCard title="Working Time by Day" sub="Total lift time per calendar day">
+                      <ResponsiveContainer width="100%" height={210}>
+                        <BarChart data={workingByDay} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                          <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+                          <YAxis tickFormatter={v => fmtMins(v)} tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} width={48} />
+                          <RTooltip content={<BarTip />} cursor={{ fill: '#f9fafb' }} />
+                          <Bar dataKey="mins" name="Working Time" fill={BRAND} radius={[4, 4, 0, 0]} maxBarSize={36} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </ChartCard>
+                  </div>
 
                   {/* Idle Time by Crane */}
-                  <ChartCard title="Idle Time by Crane" sub="Avg working vs idle per active day · 600 min window" fullWidth>
-                    <ResponsiveContainer width="100%" height={280}>
-                      <BarChart data={idleByCrane} margin={{ top: 4, right: 8, bottom: 64, left: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
-                        <XAxis dataKey="crane" tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false} angle={-38} textAnchor="end" interval={0} />
-                        <YAxis tickFormatter={v => fmtMins(v)} tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} width={48} domain={[0, IDLE_WINDOW]} />
-                        <RTooltip content={<BarTip />} cursor={{ fill: '#f9fafb' }} />
-                        <Bar dataKey="working" name="Working" stackId="a" fill={BRAND} />
-                        <Bar dataKey="idle" name="Idle" stackId="a" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </ChartCard>
+                  <div ref={chartIdleByCrane} style={{ gridColumn: '1 / -1' }}>
+                    <ChartCard title="Idle Time by Crane" sub="Avg working vs idle per active day · 600 min window">
+                      <ResponsiveContainer width="100%" height={280}>
+                        <BarChart data={idleByCrane} margin={{ top: 4, right: 8, bottom: 64, left: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                          <XAxis dataKey="crane" tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false} angle={-38} textAnchor="end" interval={0} />
+                          <YAxis tickFormatter={v => fmtMins(v)} tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} width={48} domain={[0, IDLE_WINDOW]} />
+                          <RTooltip content={<BarTip />} cursor={{ fill: '#f9fafb' }} />
+                          <Bar dataKey="working" name="Working" stackId="a" fill={BRAND} />
+                          <Bar dataKey="idle" name="Idle" stackId="a" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </ChartCard>
+                  </div>
 
-                  {/* Idle Time by Day — NEW */}
-                  <ChartCard title="Idle Time by Day" sub="Total idle minutes across all active cranes per day" fullWidth>
-                    <ResponsiveContainer width="100%" height={210}>
-                      <BarChart data={idleByDay} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
-                        <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-                        <YAxis tickFormatter={v => fmtMins(v)} tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} width={48} />
-                        <RTooltip content={<BarTip />} cursor={{ fill: '#f9fafb' }} />
-                        <Bar dataKey="idle" name="Idle Time" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={36} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </ChartCard>
+                  {/* Idle Time by Day */}
+                  <div ref={chartIdleByDay} style={{ gridColumn: '1 / -1' }}>
+                    <ChartCard title="Idle Time by Day" sub="Total idle minutes across all active cranes per day">
+                      <ResponsiveContainer width="100%" height={210}>
+                        <BarChart data={idleByDay} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                          <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+                          <YAxis tickFormatter={v => fmtMins(v)} tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} width={48} />
+                          <RTooltip content={<BarTip />} cursor={{ fill: '#f9fafb' }} />
+                          <Bar dataKey="idle" name="Idle Time" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={36} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </ChartCard>
+                  </div>
 
                 </div>
 
@@ -563,42 +795,46 @@ function CraneAnalyticsContent() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
 
                   {/* Time by Company — right-side legend */}
-                  <ChartCard title="Time Allocation by Company" sub="Share of working time per company">
-                    <div style={{ display: 'flex', alignItems: 'center', height: '210px' }}>
-                      <div style={{ flex: '0 0 50%', height: '210px' }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie data={byCompany} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={82} innerRadius={32}>
-                              {byCompany.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                            </Pie>
-                            <RTooltip content={<PieTip />} />
-                          </PieChart>
-                        </ResponsiveContainer>
+                  <div ref={chartByCompany}>
+                    <ChartCard title="Time Allocation by Company" sub="Share of working time per company">
+                      <div style={{ display: 'flex', alignItems: 'center', height: '210px' }}>
+                        <div style={{ flex: '0 0 50%', height: '210px' }}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie data={byCompany} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={82} innerRadius={32}>
+                                {byCompany.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                              </Pie>
+                              <RTooltip content={<PieTip />} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
+                        <div style={{ flex: '0 0 50%', paddingLeft: '0.75rem', boxSizing: 'border-box', overflow: 'hidden' }}>
+                          <PieLegend data={byCompany} total={companyTotal} />
+                        </div>
                       </div>
-                      <div style={{ flex: '0 0 50%', paddingLeft: '0.75rem', boxSizing: 'border-box', overflow: 'hidden' }}>
-                        <PieLegend data={byCompany} total={companyTotal} />
-                      </div>
-                    </div>
-                  </ChartCard>
+                    </ChartCard>
+                  </div>
 
                   {/* Time by Status — right-side legend */}
-                  <ChartCard title="Time Allocation by Status" sub="Share of working time per lift status">
-                    <div style={{ display: 'flex', alignItems: 'center', height: '210px' }}>
-                      <div style={{ flex: '0 0 50%', height: '210px' }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie data={byStatus} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={82} innerRadius={32}>
-                              {byStatus.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                            </Pie>
-                            <RTooltip content={<PieTip />} />
-                          </PieChart>
-                        </ResponsiveContainer>
+                  <div ref={chartByStatus}>
+                    <ChartCard title="Time Allocation by Status" sub="Share of working time per lift status">
+                      <div style={{ display: 'flex', alignItems: 'center', height: '210px' }}>
+                        <div style={{ flex: '0 0 50%', height: '210px' }}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie data={byStatus} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={82} innerRadius={32}>
+                                {byStatus.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                              </Pie>
+                              <RTooltip content={<PieTip />} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
+                        <div style={{ flex: '0 0 50%', paddingLeft: '0.75rem', boxSizing: 'border-box', overflow: 'hidden' }}>
+                          <PieLegend data={byStatus} total={statusTotal} />
+                        </div>
                       </div>
-                      <div style={{ flex: '0 0 50%', paddingLeft: '0.75rem', boxSizing: 'border-box', overflow: 'hidden' }}>
-                        <PieLegend data={byStatus} total={statusTotal} />
-                      </div>
-                    </div>
-                  </ChartCard>
+                    </ChartCard>
+                  </div>
 
                 </div>
 
