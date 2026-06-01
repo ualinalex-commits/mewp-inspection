@@ -510,201 +510,257 @@ function CraneAnalyticsContent() {
       const { jsPDF } = await import('jspdf');
       const html2canvas = (await import('html2canvas')).default;
 
-      // Entire PDF in A4 landscape (297mm × 210mm)
-      const doc = new jsPDF('l', 'mm', 'a4');
-      const margin = 14;
-      const footerH = 10; // reserved at bottom for page numbers
-      const getW = () => doc.internal.pageSize.getWidth();
-      const getH = () => doc.internal.pageSize.getHeight();
-      const maxY = () => getH() - margin - footerH;
-      let y = margin;
+      const doc  = new jsPDF('l', 'mm', 'a4');
+      const PW   = doc.internal.pageSize.getWidth();   // 297
+      const PH   = doc.internal.pageSize.getHeight();  // 210
+      const mg   = 12;
+      const cW   = PW - mg * 2;                        // 273
+      const hW   = (cW - 5) / 2;                       // 134 — half-width for side-by-side
+      const HDR_H     = 6.5;
+      const ROW_H     = 5.5;
+      const LOG_ROW_H = 5;
+      const STAT_H    = 15;
+      const bottomEdge = PH - mg - 11;
+      const footerY    = PH - 5;
 
-      const drawSep = () => {
-        doc.setDrawColor('#e5e7eb');
-        doc.setLineWidth(0.4);
-        doc.line(margin, y, getW() - margin, y);
+      // ── Convert hex colour to RGB ─────────────────────────────────
+      const hexRgb = (hex: string) => {
+        const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return m ? { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) } : { r: 128, g: 128, b: 128 };
       };
 
-      const drawTblHeader = (headers: string[], colWidths: number[], startX: number, startY: number) => {
-        doc.setFontSize(7);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor('#6b7280');
-        let x = startX;
-        headers.forEach((h, i) => { doc.text(h.toUpperCase(), x, startY); x += colWidths[i]; });
-        const lineY = startY + 2.5;
-        doc.setDrawColor('#e5e7eb');
-        doc.setLineWidth(0.3);
-        doc.line(startX, lineY, startX + colWidths.reduce((a, b) => a + b, 0), lineY);
-        return lineY + 3.5;
+      // ── Clip text to fit a column (mm width → approx char count) ──
+      const clip = (s: string, maxMm: number, cw = 1.75): string => {
+        if (!s) return '—';
+        const max = Math.floor(maxMm / cw);
+        return s.length > max ? s.substring(0, max - 1) + '…' : s;
       };
 
+      // ── Brand-red section heading ─────────────────────────────────
+      const secHdr = (label: string, y: number): number => {
+        doc.setFontSize(7.5); doc.setFont('helvetica', 'bold'); doc.setTextColor('#d02a35');
+        doc.text(label, mg, y);
+        return y + 5;
+      };
+
+      // ── Table header — y0 = top of header rect; returns top of 1st data row ──
+      const tblHdr = (hs: string[], ws: number[], x0: number, y0: number): number => {
+        const tw = ws.reduce((a, b) => a + b, 0);
+        doc.setFillColor(243, 244, 246);
+        doc.rect(x0, y0, tw, HDR_H, 'F');
+        doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor('#6b7280');
+        let x = x0;
+        hs.forEach((h, i) => { doc.text(h.toUpperCase(), x + 1.5, y0 + HDR_H - 1.5); x += ws[i]; });
+        doc.setDrawColor('#e5e7eb'); doc.setLineWidth(0.3);
+        doc.line(x0, y0 + HDR_H, x0 + tw, y0 + HDR_H);
+        return y0 + HDR_H; // top of first data row
+      };
+
+      // ── Table body row — y0 = top of this row rect ────────────────
+      const tblRow = (cells: string[], ws: number[], x0: number, y0: number, rowH: number, even: boolean) => {
+        if (even) {
+          doc.setFillColor(249, 250, 251);
+          doc.rect(x0, y0, ws.reduce((a, b) => a + b, 0), rowH, 'F');
+        }
+        doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor('#374151');
+        let x = x0;
+        cells.forEach((cell, i) => { doc.text(clip(cell, ws[i] - 3), x + 1.5, y0 + rowH - 1.5); x += ws[i]; });
+      };
+
+      // ── Capture a chart div as PNG ────────────────────────────────
+      const captureChart = async (ref: React.RefObject<HTMLDivElement | null>) => {
+        if (!ref.current) return null;
+        const canvas = await html2canvas(ref.current, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
+        return { data: canvas.toDataURL('image/png'), w: canvas.width, h: canvas.height };
+      };
+
+      // ── Add image, returns rendered height in mm ──────────────────
+      const placeImg = (img: { data: string; w: number; h: number }, x: number, y: number, w: number): number => {
+        const h = w * (img.h / img.w);
+        doc.addImage(img.data, 'PNG', x, y, w, h);
+        return h;
+      };
+
+      // ── Stamp "ProLifting Software" + "Page X of Y" on every page ─
+      const stampFooters = () => {
+        const total = doc.getNumberOfPages();
+        for (let p = 1; p <= total; p++) {
+          doc.setPage(p);
+          doc.setFontSize(6.5); doc.setFont('helvetica', 'normal'); doc.setTextColor('#9ca3af');
+          doc.text('ProLifting Software', mg, footerY);
+          const pt = `Page ${p} of ${total}`;
+          doc.text(pt, PW - mg - doc.getTextWidth(pt), footerY);
+        }
+      };
+
+      // Computed totals (local so closure is always fresh)
+      const coTotal = byCompany.reduce((s, r) => s + r.value, 0);
+      const stTotal = byStatus.reduce((s, r) => s + r.value, 0);
       const siteName = effectiveSite || 'All Sites';
-      const contentW = getW() - margin * 2; // 269mm in A4 landscape
+
+      // ══════════════════════════════════════════════════════════════
+      // PAGE 1 — COVER BAND + STAT GRID + DAILY BREAKDOWN
+      // ══════════════════════════════════════════════════════════════
+
+      // Full-width red header band
+      doc.setFillColor(208, 42, 53);
+      doc.rect(0, 0, PW, 52, 'F');
 
       // Title
-      doc.setFontSize(22);
-      doc.setTextColor('#d02a35');
-      doc.setFont('helvetica', 'bold');
-      doc.text('Crane Log Analytics Report', margin, y);
-      y += 8;
+      doc.setTextColor('#ffffff');
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(22);
+      doc.text('Crane Log Analytics Report', mg, 21);
 
-      // Header line: Site Name | Crane: X (if selected) | Period: …
-      doc.setFontSize(10);
-      doc.setTextColor('#374151');
-      doc.setFont('helvetica', 'normal');
-      const headerParts = [
-        siteName,
-        ...(crane ? [`Crane: ${crane}`] : []),
-        `Period: ${fmtDateLong(startDate)} — ${fmtDateLong(endDate)}`,
-      ];
-      doc.text(headerParts.join('  |  '), margin, y);
-      y += 8;
+      // Site · crane · period
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+      const subParts = [siteName, ...(crane ? [`Crane: ${crane}`] : []), `${fmtDateLong(startDate)} — ${fmtDateLong(endDate)}`];
+      doc.text(subParts.join('   ·   '), mg, 32);
 
-      drawSep(); y += 6;
+      // Top-right: branding
+      doc.setFontSize(8); doc.setTextColor('#fca5a5');
+      const proTxt = 'ProLifting Software';
+      doc.text(proTxt, PW - mg - doc.getTextWidth(proTxt), 10);
 
-      // Stats — 7 cards across the full landscape width
-      doc.setFontSize(7.5);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor('#6b7280');
-      doc.text('STATISTICS', margin, y);
-      y += 5;
+      // Bottom-right: generated date
+      const genTxt = `Generated ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+      doc.text(genTxt, PW - mg - doc.getTextWidth(genTxt), 48);
 
+      let y = 60;
+
+      // ── Stat grid: 4 columns × 2 rows ──────────────────────────────
       const statItems = [
-        { label: 'Total Logs', value: stats.totalLifts.toLocaleString() },
+        { label: 'Total Logs',        value: stats.totalLifts.toLocaleString() },
         { label: 'Total Working Time', value: fmtMins(stats.totalMins) },
-        { label: 'Avg Log Duration', value: fmtMins(stats.avgMins) },
-        { label: 'Most Active Crane', value: stats.topCrane },
-        { label: 'Total Idle Time', value: fmtMins(stats.totalIdleMins) },
-        { label: 'Avg Daily Idle', value: `${Math.round(stats.avgDailyIdlePct)}%` },
-        { label: 'Busiest Day', value: stats.busiestDayFmt },
+        { label: 'Total Idle Time',    value: fmtMins(stats.totalIdleMins) },
+        { label: 'Avg Log Duration',   value: fmtMins(stats.avgMins) },
+        { label: 'Avg Daily Idle %',   value: `${Math.round(stats.avgDailyIdlePct)}%` },
+        { label: 'Most Active Crane',  value: stats.topCrane },
+        { label: 'Busiest Day',        value: stats.busiestDayFmt },
       ];
-
-      // All 7 in one row — 269 / 7 ≈ 38.4mm each
-      const statColW = contentW / statItems.length;
+      const COLS = 4;
+      const scW  = cW / COLS;
       for (let i = 0; i < statItems.length; i++) {
-        const sx = margin + i * statColW;
-        doc.setFontSize(12);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor('#111827');
-        const val = statItems[i].value;
-        doc.text(val.length > 10 ? val.substring(0, 9) + '…' : val, sx, y);
-        doc.setFontSize(6.5);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor('#6b7280');
-        doc.text(statItems[i].label.toUpperCase(), sx, y + 4.5);
+        const col = i % COLS;
+        const row = Math.floor(i / COLS);
+        const sx = mg + col * scW;
+        const sy = y + row * STAT_H;
+        doc.setFillColor(249, 250, 251); doc.setDrawColor(229, 231, 235); doc.setLineWidth(0.25);
+        doc.roundedRect(sx + 1, sy, scW - 2, STAT_H - 1, 1.5, 1.5, 'FD');
+        doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor('#111827');
+        doc.text(clip(statItems[i].value, scW - 6, 2.0), sx + 3.5, sy + 7);
+        doc.setFontSize(6); doc.setFont('helvetica', 'normal'); doc.setTextColor('#6b7280');
+        doc.text(statItems[i].label.toUpperCase(), sx + 3.5, sy + 11.5);
       }
+      y += Math.ceil(statItems.length / COLS) * STAT_H + 3;
 
-      y += 14;
-      drawSep(); y += 8;
-
-      // Charts
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor('#6b7280');
-      doc.text('CHARTS', margin, y);
+      // Thin red accent line
+      doc.setFillColor(208, 42, 53);
+      doc.rect(mg, y, cW, 0.5, 'F');
       y += 5;
 
-      const chartRefs = [chartWorkingByDay, chartIdleByCrane, chartIdleByDay, chartByCompany, chartByStatus];
-
-      for (const ref of chartRefs) {
-        if (!ref.current) continue;
-        const canvas = await html2canvas(ref.current, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
-        const imgData = canvas.toDataURL('image/png');
-        const imgH = contentW * (canvas.height / canvas.width);
-        if (y + imgH > maxY()) { doc.addPage(); y = margin; }
-        doc.addImage(imgData, 'PNG', margin, y, contentW, imgH);
-        y += imgH + 6;
+      // ── Daily Breakdown table ────────────────────────────────────────
+      y = secHdr('DAILY BREAKDOWN', y);
+      const dbHs = ['Date', 'Crane', 'Logs', 'Working', 'Idle', 'Idle %', 'First Log', 'Last Log'];
+      const dbWs = [40, 65, 18, 34, 28, 24, 32, 32]; // 273mm total
+      y = tblHdr(dbHs, dbWs, mg, y);
+      for (let i = 0; i < dailyBreakdown.length; i++) {
+        if (y > bottomEdge) { doc.addPage(); y = mg; y = tblHdr(dbHs, dbWs, mg, y); }
+        const r = dailyBreakdown[i];
+        tblRow([fmtDateLong(r.date), r.crane, String(r.lifts), fmtMins(r.workingMins),
+          fmtMins(r.idleMins), `${r.idlePct}%`, fmtTime(r.firstLift), fmtTime(r.lastLift)],
+          dbWs, mg, y, ROW_H, i % 2 === 1);
+        y += ROW_H;
       }
 
-      // Daily breakdown table
-      doc.addPage();
-      y = margin;
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor('#d02a35');
-      doc.text('Daily Breakdown', margin, y);
-      y += 9;
+      // ══════════════════════════════════════════════════════════════
+      // PAGE 2 — CHARTS (side by side)
+      // ══════════════════════════════════════════════════════════════
+      doc.addPage(); y = mg;
+      y = secHdr('CHARTS', y);
 
-      // Wider columns now that we're in landscape — sum = 269mm
-      const dbHeaders = ['Date',  'Crane', 'Logs', 'Working', 'Idle', 'Idle %', 'First Log', 'Last Log'];
-      const dbColW    = [40,      62,      20,       33,        28,     27,       30,            29];
+      // Capture all charts in parallel
+      const [imgWbD, imgIbD, imgIbC, imgCo, imgSt] = await Promise.all([
+        captureChart(chartWorkingByDay),
+        captureChart(chartIdleByDay),
+        captureChart(chartIdleByCrane),
+        captureChart(chartByCompany),
+        captureChart(chartByStatus),
+      ]);
 
-      y = drawTblHeader(dbHeaders, dbColW, margin, y);
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor('#374151');
+      // Row 1: Working by Day (left) | Idle by Day (right)
+      let r1H = 0;
+      if (imgWbD) r1H = Math.max(r1H, placeImg(imgWbD, mg,          y, hW));
+      if (imgIbD) r1H = Math.max(r1H, placeImg(imgIbD, mg + hW + 5, y, hW));
+      y += r1H + 5;
 
-      for (const row of dailyBreakdown) {
-        if (y > maxY()) {
-          doc.addPage(); y = margin;
-          y = drawTblHeader(dbHeaders, dbColW, margin, y);
-          doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor('#374151');
-        }
-        let x = margin;
-        [fmtDateLong(row.date), row.crane, String(row.lifts), fmtMins(row.workingMins),
-          fmtMins(row.idleMins), `${row.idlePct}%`, fmtTime(row.firstLift), fmtTime(row.lastLift)]
-          .forEach((cell, i) => {
-            const max = Math.floor(dbColW[i] / 1.9);
-            doc.text(cell.length > max ? cell.substring(0, max - 1) + '…' : cell, x, y);
-            x += dbColW[i];
-          });
-        y += 6;
+      // Row 2: Idle by Crane (left) | blank right
+      if (imgIbC) { y += placeImg(imgIbC, mg, y, hW) + 5; }
+
+      // ══════════════════════════════════════════════════════════════
+      // PAGE 3 — COMPANY & STATUS BREAKDOWN
+      // ══════════════════════════════════════════════════════════════
+      doc.addPage(); y = mg;
+
+      const drawAllocationSection = (
+        label: string,
+        img: { data: string; w: number; h: number } | null,
+        items: { name: string; value: number }[],
+        total: number,
+        yStart: number
+      ): number => {
+        let ly = secHdr(label, yStart);
+        const imgH = img ? placeImg(img, mg, ly, hW) : 0;
+        // Right-side table
+        const tX = mg + hW + 5;
+        const tW = hW;
+        doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor('#6b7280');
+        doc.text('COMPANY / STATUS', tX + 1.5, ly + 4);
+        doc.text('TIME',  tX + tW * 0.62, ly + 4);
+        doc.text('SHARE', tX + tW * 0.83, ly + 4);
+        doc.setDrawColor('#e5e7eb'); doc.setLineWidth(0.3);
+        doc.line(tX, ly + 5.5, tX + tW, ly + 5.5);
+        let ty = ly + 10;
+        items.forEach((item, i) => {
+          if (ty > ly + imgH + 5) return;
+          const { r: cr, g: cg, b: cb } = hexRgb(COLORS[i % COLORS.length]);
+          doc.setFillColor(cr, cg, cb);
+          doc.rect(tX + 1.5, ty - 2.5, 3, 3, 'F');
+          doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor('#374151');
+          const pct = total > 0 ? Math.round((item.value / total) * 100) : 0;
+          doc.text(clip(item.name, tW * 0.58 - 5, 1.7), tX + 6, ty);
+          doc.text(fmtMins(item.value), tX + tW * 0.62, ty);
+          doc.text(`${pct}%`, tX + tW * 0.83, ty);
+          ty += 5.5;
+        });
+        return ly + Math.max(imgH, ty - ly) + 6;
+      };
+
+      y = drawAllocationSection('TIME ALLOCATION BY COMPANY', imgCo, byCompany, coTotal, y);
+      if (y + 40 > bottomEdge) { doc.addPage(); y = mg; }
+      y = drawAllocationSection('TIME ALLOCATION BY STATUS',  imgSt, byStatus,  stTotal, y);
+
+      // ══════════════════════════════════════════════════════════════
+      // PAGE 4+ — FULL LOG ENTRIES
+      // ══════════════════════════════════════════════════════════════
+      doc.addPage(); y = mg;
+      y = secHdr(`ALL LOG ENTRIES  ·  ${sortedLogs.length.toLocaleString()} records`, y);
+      const lgHs = ['Date', 'Crane', 'Supervisor', 'Company', 'Load Description', 'Status', 'Start', 'End', 'Duration'];
+      const lgWs = [28, 30, 34, 34, 65, 24, 20, 18, 20]; // 273mm total
+      y = tblHdr(lgHs, lgWs, mg, y);
+      for (let i = 0; i < sortedLogs.length; i++) {
+        if (y > bottomEdge) { doc.addPage(); y = mg; y = tblHdr(lgHs, lgWs, mg, y); }
+        const r = sortedLogs[i];
+        const dur = r.start_time && r.end_time ? fmtMins(parseMins(r.start_time, r.end_time)) : '—';
+        tblRow([fmtDateLong(r.date), r.crane || '—', r.supervisor_name || '—',
+          r.company || '—', r.load_description || '—', r.status || '—',
+          fmtTime(r.start_time), fmtTime(r.end_time), dur],
+          lgWs, mg, y, LOG_ROW_H, i % 2 === 1);
+        y += LOG_ROW_H;
       }
 
-      // Full logs table — same landscape orientation, no orientation switch needed
-      doc.addPage();
-      y = margin;
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor('#d02a35');
-      doc.text('All Log Entries', margin, y);
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor('#6b7280');
-      doc.text(`${sortedLogs.length.toLocaleString()} records`, margin + 52, y + 0.5);
-      y += 9;
+      stampFooters();
 
-      // 10 columns across 269mm — sum = 269mm
-      const logHeaders = ['Date', 'Site', 'Crane', 'Supervisor', 'Company', 'Load Description', 'Status', 'Start', 'End', 'Duration'];
-      const logColW    = [26,     32,     25,       27,           27,        55,                  21,       19,     18,    19];
-
-      y = drawTblHeader(logHeaders, logColW, margin, y);
-      doc.setFontSize(6.5);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor('#374151');
-
-      for (const row of sortedLogs) {
-        if (y > maxY()) {
-          doc.addPage(); y = margin;
-          y = drawTblHeader(logHeaders, logColW, margin, y);
-          doc.setFontSize(6.5); doc.setFont('helvetica', 'normal'); doc.setTextColor('#374151');
-        }
-        let x = margin;
-        const dur = row.start_time && row.end_time ? fmtMins(parseMins(row.start_time, row.end_time)) : '—';
-        [fmtDateLong(row.date), row.site || '—', row.crane || '—', row.supervisor_name || '—',
-          row.company || '—', row.load_description || '—', row.status || '—',
-          fmtTime(row.start_time), fmtTime(row.end_time), dur]
-          .forEach((cell, i) => {
-            const max = Math.floor(logColW[i] / 1.55);
-            doc.text(cell.length > max ? cell.substring(0, max - 1) + '…' : cell, x, y);
-            x += logColW[i];
-          });
-        y += 5;
-      }
-
-      // Page numbers — stamp every page after all content is written
-      const totalPages = doc.getNumberOfPages();
-      for (let p = 1; p <= totalPages; p++) {
-        doc.setPage(p);
-        doc.setFontSize(7);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor('#9ca3af');
-        const pageText = `Page ${p} of ${totalPages}`;
-        const textW = doc.getTextWidth(pageText);
-        doc.text(pageText, (getW() - textW) / 2, getH() - 5);
-      }
-
-      const safeSite = (effectiveSite || 'all-sites').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const safeSite  = (effectiveSite || 'all-sites').toLowerCase().replace(/[^a-z0-9]+/g, '-');
       const safeCrane = crane ? `-${crane.toLowerCase().replace(/[^a-z0-9]+/g, '-')}` : '';
       doc.save(`crane-report-${safeSite}${safeCrane}-${startDate}-${endDate}.pdf`);
     } catch (err) {
@@ -712,7 +768,7 @@ function CraneAnalyticsContent() {
     } finally {
       setPdfLoading(false);
     }
-  }, [stats, dailyBreakdown, sortedLogs, effectiveSite, crane, startDate, endDate]);
+  }, [stats, dailyBreakdown, sortedLogs, byCompany, byStatus, effectiveSite, crane, startDate, endDate]);
 
 
   function toggleSort(col: string) {
