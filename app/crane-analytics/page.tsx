@@ -248,13 +248,14 @@ function CraneAnalyticsContent() {
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [pdfLoading, setPdfLoading] = useState(false);
   const [dailyReportLoading, setDailyReportLoading] = useState(false);
+  const [showDailyPicker, setShowDailyPicker] = useState(false);
+  const [dailyReportDate, setDailyReportDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   const chartWorkingByDay = useRef<HTMLDivElement>(null);
   const chartIdleByCrane = useRef<HTMLDivElement>(null);
   const chartIdleByDay = useRef<HTMLDivElement>(null);
   const chartByCompany = useRef<HTMLDivElement>(null);
   const chartByStatus = useRef<HTMLDivElement>(null);
-  const dailyDateInputRef = useRef<HTMLInputElement>(null);
 
   const effectiveSite = lockedSiteName ?? site;
 
@@ -1005,34 +1006,96 @@ function CraneAnalyticsContent() {
               </div>
             )}
           </div>
-          <input
-            ref={dailyDateInputRef}
-            type="date"
-            style={{ display: 'none' }}
-            onChange={e => { if (e.target.value) { downloadDailyPDF(e.target.value); e.target.value = ''; } }}
-          />
-          <button
-            onClick={() => dailyDateInputRef.current?.click()}
-            disabled={dailyReportLoading || loading}
-            style={{
-              background: '#fff',
-              color: BRAND,
-              border: `2px solid ${BRAND}`,
-              borderRadius: '8px',
-              padding: '0.45rem 0.9rem',
-              fontSize: '0.82rem',
-              fontWeight: 700,
-              cursor: dailyReportLoading || loading ? 'not-allowed' : 'pointer',
-              opacity: dailyReportLoading || loading ? 0.6 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              flexShrink: 0,
-              fontFamily: 'system-ui, sans-serif',
-            }}
-          >
-            {dailyReportLoading ? 'Generating…' : '📅 Daily Report'}
-          </button>
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <button
+              onClick={() => {
+                console.log('[Daily Report] button clicked, toggling picker');
+                setShowDailyPicker(p => !p);
+              }}
+              disabled={dailyReportLoading || loading}
+              style={{
+                background: '#fff',
+                color: BRAND,
+                border: `2px solid ${BRAND}`,
+                borderRadius: '8px',
+                padding: '0.45rem 0.9rem',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                cursor: dailyReportLoading || loading ? 'not-allowed' : 'pointer',
+                opacity: dailyReportLoading || loading ? 0.6 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                fontFamily: 'system-ui, sans-serif',
+              }}
+            >
+              {dailyReportLoading ? 'Generating…' : '📅 Daily Report'}
+            </button>
+            {showDailyPicker && (
+              <div style={{
+                position: 'absolute',
+                top: 'calc(100% + 8px)',
+                right: 0,
+                background: '#fff',
+                border: '1px solid #e5e7eb',
+                borderRadius: '12px',
+                padding: '1rem',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.14)',
+                zIndex: 1000,
+                minWidth: '230px',
+              }}>
+                <div style={{ fontSize: '0.67rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem' }}>
+                  Select Date
+                </div>
+                <input
+                  type="date"
+                  value={dailyReportDate}
+                  onChange={e => setDailyReportDate(e.target.value)}
+                  style={{ ...inputStyle, marginBottom: '0.75rem' }}
+                  autoFocus
+                />
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    onClick={() => {
+                      console.log('[Daily Report] generating for date:', dailyReportDate);
+                      setShowDailyPicker(false);
+                      downloadDailyPDF(dailyReportDate);
+                    }}
+                    disabled={!dailyReportDate || dailyReportLoading}
+                    style={{
+                      flex: 1,
+                      background: BRAND,
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '0.5rem',
+                      fontSize: '0.82rem',
+                      fontWeight: 700,
+                      cursor: !dailyReportDate || dailyReportLoading ? 'not-allowed' : 'pointer',
+                      fontFamily: 'system-ui, sans-serif',
+                    }}
+                  >
+                    Generate PDF
+                  </button>
+                  <button
+                    onClick={() => setShowDailyPicker(false)}
+                    style={{
+                      background: '#f3f4f6',
+                      color: '#374151',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '0.5rem 0.75rem',
+                      fontSize: '0.82rem',
+                      cursor: 'pointer',
+                      fontFamily: 'system-ui, sans-serif',
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
           <button
             onClick={downloadPDF}
             disabled={pdfLoading || loading}
