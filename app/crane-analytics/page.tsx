@@ -570,9 +570,9 @@ function CraneAnalyticsContent() {
       y += 5;
 
       const statItems = [
-        { label: 'Total Lifts', value: stats.totalLifts.toLocaleString() },
+        { label: 'Total Logs', value: stats.totalLifts.toLocaleString() },
         { label: 'Total Working Time', value: fmtMins(stats.totalMins) },
-        { label: 'Avg Lift Duration', value: fmtMins(stats.avgMins) },
+        { label: 'Avg Log Duration', value: fmtMins(stats.avgMins) },
         { label: 'Most Active Crane', value: stats.topCrane },
         { label: 'Total Idle Time', value: fmtMins(stats.totalIdleMins) },
         { label: 'Avg Daily Idle', value: `${Math.round(stats.avgDailyIdlePct)}%` },
@@ -626,7 +626,7 @@ function CraneAnalyticsContent() {
       y += 9;
 
       // Wider columns now that we're in landscape — sum = 269mm
-      const dbHeaders = ['Date',  'Crane', 'Lifts', 'Working', 'Idle', 'Idle %', 'First Lift', 'Last Lift'];
+      const dbHeaders = ['Date',  'Crane', 'Logs', 'Working', 'Idle', 'Idle %', 'First Log', 'Last Log'];
       const dbColW    = [40,      62,      20,       33,        28,     27,       30,            29];
 
       y = drawTblHeader(dbHeaders, dbColW, margin, y);
@@ -822,9 +822,9 @@ function CraneAnalyticsContent() {
           <>
             {/* 7 Stat Cards */}
             <div className="ca-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
-              <StatCard value={stats.totalLifts.toLocaleString()} label="Total Lifts" />
+              <StatCard value={stats.totalLifts.toLocaleString()} label="Total Logs" />
               <StatCard value={fmtMins(stats.totalMins)} label="Total Working Time" />
-              <StatCard value={fmtMins(stats.avgMins)} label="Avg Lift Duration" />
+              <StatCard value={fmtMins(stats.avgMins)} label="Avg Log Duration" />
               <StatCard value={stats.topCrane} label="Most Active Crane" />
               <StatCard value={fmtMins(stats.totalIdleMins)} label="Total Idle Time" />
               <StatCard value={`${Math.round(stats.avgDailyIdlePct)}%`} label="Avg Daily Idle" />
@@ -841,7 +841,7 @@ function CraneAnalyticsContent() {
 
                   {/* Working Time by Day */}
                   <div ref={chartWorkingByDay} style={{ gridColumn: '1 / -1' }}>
-                    <ChartCard title="Working Time by Day" sub="Total lift time per calendar day">
+                    <ChartCard title="Working Time by Day" sub="Total log time per calendar day">
                       <ResponsiveContainer width="100%" height={210}>
                         <BarChart data={workingByDay} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
@@ -913,7 +913,7 @@ function CraneAnalyticsContent() {
 
                   {/* Time by Status */}
                   <div ref={chartByStatus}>
-                    <ChartCard title="Time Allocation by Status" sub="Share of working time per lift status">
+                    <ChartCard title="Time Allocation by Status" sub="Share of working time per log status">
                       <div className="ca-pie-inner" style={{ display: 'flex', alignItems: 'center', height: '210px' }}>
                         <div className="ca-pie-chart-half" style={{ flex: '0 0 50%', height: '210px' }}>
                           <ResponsiveContainer width="100%" height="100%">
@@ -943,7 +943,7 @@ function CraneAnalyticsContent() {
                     <table style={{ width: '100%', minWidth: '650px', borderCollapse: 'collapse' }}>
                       <thead>
                         <tr>
-                          {['Date', 'Crane', 'Total Lifts', 'Working', 'Idle', 'Idle %', 'First Lift', 'Last Lift'].map(col => (
+                          {['Date', 'Crane', 'Total Logs', 'Working', 'Idle', 'Idle %', 'First Log', 'Last Log'].map(col => (
                             <th key={col} style={thBase}>{col}</th>
                           ))}
                         </tr>
