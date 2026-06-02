@@ -9,6 +9,7 @@ import {
 } from 'recharts';
 
 type CraneLog = {
+  id: string;
   site: string;
   crane: string;
   company: string;
@@ -97,6 +98,18 @@ function minsToTimeStr(mins: number): string {
   const h = Math.floor(mins / 60);
   const m = mins % 60;
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+// "2024-01-15 18:30:00" → "2024-01-15T18:30" for datetime-local input
+function toDatetimeLocal(dt: string | null): string {
+  if (!dt) return '';
+  return dt.replace(' ', 'T').slice(0, 16);
+}
+
+// "2024-01-15T18:30" → "2024-01-15 18:30:00" for Supabase
+function fromDatetimeLocal(dt: string): string {
+  if (!dt) return '';
+  return dt.replace('T', ' ') + ':00';
 }
 
 function isoMonthStart(): string {
@@ -247,6 +260,13 @@ function CraneAnalyticsContent() {
   const [sortCol, setSortCol] = useState('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [editingLog, setEditingLog] = useState<CraneLog | null>(null);
+  const [editForm, setEditForm] = useState({ date: '', site: '', crane: '', supervisor_name: '', company: '', load_description: '', status: '', start_time: '', end_time: '' });
+  const [editSaving, setEditSaving] = useState(false);
+  const [editSaveError, setEditSaveError] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
 
   const chartWorkingByDay = useRef<HTMLDivElement>(null);
   const chartIdleByCrane = useRef<HTMLDivElement>(null);
@@ -299,7 +319,7 @@ function CraneAnalyticsContent() {
     setError(null);
     let query = supabase
       .from('crane_logs')
-      .select('site, crane, company, status, date, start_time, end_time, supervisor_name, load_description')
+      .select('id, site, crane, company, status, date, start_time, end_time, supervisor_name, load_description')
       .gte('date', startDate)
       .lte('date', endDate);
     if (lockedSiteName) query = query.eq('site', lockedSiteName);
@@ -771,6 +791,65 @@ function CraneAnalyticsContent() {
   }, [stats, dailyBreakdown, sortedLogs, byCompany, byStatus, effectiveSite, crane, startDate, endDate]);
 
 
+  function openEdit(log: CraneLog) {
+    setEditingLog(log);
+    setEditSaveError(null);
+    setEditForm({
+      date: log.date || '',
+      site: log.site || '',
+      crane: log.crane || '',
+      supervisor_name: log.supervisor_name || '',
+      company: log.company || '',
+      load_description: log.load_description || '',
+      status: log.status || '',
+      start_time: toDatetimeLocal(log.start_time),
+      end_time: toDatetimeLocal(log.end_time),
+    });
+  }
+
+  async function handleSave() {
+    if (!editingLog) return;
+    setEditSaving(true);
+    setEditSaveError(null);
+    const { error } = await supabase.from('crane_logs').update({
+      date: editForm.date,
+      site: editForm.site,
+      crane: editForm.crane,
+      supervisor_name: editForm.supervisor_name,
+      company: editForm.company,
+      load_description: editForm.load_description,
+      status: editForm.status,
+      start_time: editForm.start_time ? fromDatetimeLocal(editForm.start_time) : null,
+      end_time: editForm.end_time ? fromDatetimeLocal(editForm.end_time) : null,
+    }).eq('id', editingLog.id);
+    setEditSaving(false);
+    if (error) { setEditSaveError(error.message); return; }
+    setRows(prev => prev.map(r => r.id === editingLog.id ? {
+      ...r,
+      date: editForm.date,
+      site: editForm.site,
+      crane: editForm.crane,
+      supervisor_name: editForm.supervisor_name,
+      company: editForm.company,
+      load_description: editForm.load_description,
+      status: editForm.status,
+      start_time: editForm.start_time ? fromDatetimeLocal(editForm.start_time) : r.start_time,
+      end_time: editForm.end_time ? fromDatetimeLocal(editForm.end_time) : r.end_time,
+    } : r));
+    setEditingLog(null);
+    setSuccessMsg('Log updated successfully.');
+    setTimeout(() => setSuccessMsg(''), 3000);
+  }
+
+  async function handleDelete(id: string) {
+    setDeleting(true);
+    const { error } = await supabase.from('crane_logs').delete().eq('id', id);
+    setDeleting(false);
+    if (error) { alert('Delete failed: ' + error.message); return; }
+    setRows(prev => prev.filter(r => r.id !== id));
+    setDeleteConfirmId(null);
+  }
+
   function toggleSort(col: string) {
     if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     else { setSortCol(col); setSortDir('asc'); }
@@ -1036,9 +1115,14 @@ function CraneAnalyticsContent() {
                       All Log Entries
                     </div>
                     <div style={{ fontSize: '0.72rem', color: '#9ca3af' }}>{sortedLogs.length.toLocaleString()} records</div>
+                    {successMsg && (
+                      <div style={{ marginLeft: 'auto', background: '#dcfce7', color: '#15803d', borderRadius: '6px', padding: '0.25rem 0.75rem', fontSize: '0.75rem', fontWeight: 600 }}>
+                        {successMsg}
+                      </div>
+                    )}
                   </div>
                   <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', minWidth: '900px', borderCollapse: 'collapse' }}>
+                    <table style={{ width: '100%', minWidth: '960px', borderCollapse: 'collapse' }}>
                       <thead>
                         <tr>
                           {LOG_COLS.map(col => (
@@ -1055,11 +1139,12 @@ function CraneAnalyticsContent() {
                               </span>
                             </th>
                           ))}
+                          <th style={{ ...thBase, width: '72px' }}></th>
                         </tr>
                       </thead>
                       <tbody>
                         {sortedLogs.map((row, i) => (
-                          <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb' }}>
+                          <tr key={row.id || i} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb' }}>
                             <td style={tdBase}>{fmtDateLong(row.date)}</td>
                             <td style={tdBase}>{row.site || '—'}</td>
                             <td style={tdBase}>{row.crane || '—'}</td>
@@ -1074,6 +1159,18 @@ function CraneAnalyticsContent() {
                             <td style={tdBase}>
                               {row.start_time && row.end_time ? fmtMins(parseMins(row.start_time, row.end_time)) : '—'}
                             </td>
+                            <td style={{ ...tdBase, whiteSpace: 'nowrap' }}>
+                              <button
+                                onClick={() => openEdit(row)}
+                                title="Edit"
+                                style={{ background: '#f3f4f6', border: 'none', borderRadius: '6px', padding: '0.3rem 0.5rem', cursor: 'pointer', fontSize: '0.8rem', marginRight: '0.3rem', color: '#374151' }}
+                              >✏</button>
+                              <button
+                                onClick={() => setDeleteConfirmId(row.id)}
+                                title="Delete"
+                                style={{ background: '#fee2e2', border: 'none', borderRadius: '6px', padding: '0.3rem 0.5rem', cursor: 'pointer', fontSize: '0.8rem', color: '#b91c1c' }}
+                              >🗑</button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -1086,6 +1183,121 @@ function CraneAnalyticsContent() {
           </>
         )}
       </div>
+
+      {/* ── Edit Modal ── */}
+      {editingLog && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+          onClick={() => setEditingLog(null)}
+        >
+          <div
+            style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', width: '100%', maxWidth: '580px', boxShadow: '0 20px 60px rgba(0,0,0,0.25)', maxHeight: '92vh', overflowY: 'auto' }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+              <div style={{ fontSize: '1rem', fontWeight: 800, color: BRAND }}>Edit Log Entry</div>
+              <button onClick={() => setEditingLog(null)} style={{ background: 'none', border: 'none', fontSize: '1.1rem', cursor: 'pointer', color: '#6b7280', padding: '0.2rem 0.4rem' }}>✕</button>
+            </div>
+
+            {/* Form grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div>
+                <label style={labelStyle}>Date</label>
+                <input type="date" value={editForm.date} onChange={e => setEditForm(f => ({ ...f, date: e.target.value }))} style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Site</label>
+                <input type="text" value={editForm.site} onChange={e => setEditForm(f => ({ ...f, site: e.target.value }))} style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Crane</label>
+                <input type="text" value={editForm.crane} onChange={e => setEditForm(f => ({ ...f, crane: e.target.value }))} style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Supervisor</label>
+                <input type="text" value={editForm.supervisor_name} onChange={e => setEditForm(f => ({ ...f, supervisor_name: e.target.value }))} style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Company</label>
+                <input type="text" value={editForm.company} onChange={e => setEditForm(f => ({ ...f, company: e.target.value }))} style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Status</label>
+                <input type="text" value={editForm.status} onChange={e => setEditForm(f => ({ ...f, status: e.target.value }))} style={inputStyle} />
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={labelStyle}>Load Description</label>
+                <input type="text" value={editForm.load_description} onChange={e => setEditForm(f => ({ ...f, load_description: e.target.value }))} style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Start Time</label>
+                <input type="datetime-local" value={editForm.start_time} onChange={e => setEditForm(f => ({ ...f, start_time: e.target.value }))} style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>End Time</label>
+                <input type="datetime-local" value={editForm.end_time} onChange={e => setEditForm(f => ({ ...f, end_time: e.target.value }))} style={inputStyle} />
+              </div>
+            </div>
+
+            {editSaveError && (
+              <div style={{ background: '#fee2e2', color: '#991b1b', borderRadius: '8px', padding: '0.6rem 0.9rem', marginTop: '0.75rem', fontSize: '0.82rem' }}>
+                {editSaveError}
+              </div>
+            )}
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setEditingLog(null)}
+                style={{ background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: '8px', padding: '0.55rem 1rem', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'system-ui, sans-serif' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={editSaving}
+                style={{ background: BRAND, color: '#fff', border: 'none', borderRadius: '8px', padding: '0.55rem 1.25rem', fontSize: '0.85rem', fontWeight: 700, cursor: editSaving ? 'not-allowed' : 'pointer', opacity: editSaving ? 0.7 : 1, fontFamily: 'system-ui, sans-serif' }}
+              >
+                {editSaving ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete Confirm Modal ── */}
+      {deleteConfirmId && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+          onClick={() => setDeleteConfirmId(null)}
+        >
+          <div
+            style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', width: '100%', maxWidth: '400px', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ fontSize: '1rem', fontWeight: 800, color: '#111827', marginBottom: '0.5rem' }}>Delete Log Entry</div>
+            <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '1.5rem', lineHeight: 1.5 }}>
+              Are you sure you want to delete this log? This cannot be undone.
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setDeleteConfirmId(null)}
+                style={{ background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: '8px', padding: '0.55rem 1rem', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'system-ui, sans-serif' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDelete(deleteConfirmId)}
+                disabled={deleting}
+                style={{ background: '#b91c1c', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.55rem 1.25rem', fontSize: '0.85rem', fontWeight: 700, cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.7 : 1, fontFamily: 'system-ui, sans-serif' }}
+              >
+                {deleting ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
