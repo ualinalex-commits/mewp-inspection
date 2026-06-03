@@ -78,6 +78,76 @@ function overlaps(aS: string, aE: string, bS: string, bE: string): boolean {
   return timeToMins(aS) < timeToMins(bE) && timeToMins(aE) > timeToMins(bS);
 }
 
+// ── Repeat date utilities ─────────────────────────────────────────────────────
+function parseLocal(s: string): Date {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function toStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function shiftDays(d: Date, n: number): Date {
+  const r = new Date(d);
+  r.setDate(r.getDate() + n);
+  return r;
+}
+
+function isWorkday(d: Date): boolean {
+  const w = d.getDay();
+  return w >= 1 && w <= 5;
+}
+
+function restOfWeekDates(from: string): string[] {
+  const start = parseLocal(from);
+  const dow = start.getDay();
+  if (dow === 0 || dow === 6) return [];
+  return Array.from({ length: 5 - dow + 1 }, (_, i) => toStr(shiftDays(start, i)));
+}
+
+function specificWeekdayDates(from: string, days: number[]): string[] {
+  if (!days.length) return [];
+  const start = parseLocal(from);
+  const dow = start.getDay();
+  const back = dow === 0 ? 6 : dow - 1;
+  const monday = shiftDays(start, -back);
+  const result: string[] = [];
+  for (let w = 0; w < 4; w++) {
+    for (const day of [...days].sort((a, b) => a - b)) {
+      const d = shiftDays(monday, w * 7 + (day - 1));
+      if (d >= start) result.push(toStr(d));
+    }
+  }
+  return result;
+}
+
+function rangeDates(from: string, to: string): string[] {
+  const start = parseLocal(from);
+  const end = parseLocal(to);
+  const result: string[] = [];
+  const cur = new Date(start);
+  while (cur <= end) {
+    if (isWorkday(cur)) result.push(toStr(new Date(cur)));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return result;
+}
+
+function fmtD(s: string): string {
+  const d = parseLocal(s);
+  const DAY = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${DAY[d.getDay()]} ${d.getDate()} ${MON[d.getMonth()]}`;
+}
+
+type RepeatType = 'week' | 'weekdays' | 'range';
+
+const WEEKDAYS = [
+  { l: 'Mon', v: 1 }, { l: 'Tue', v: 2 }, { l: 'Wed', v: 3 },
+  { l: 'Thu', v: 4 }, { l: 'Fri', v: 5 },
+];
+
 // ── Timeline (admin variant — multi-crane, colour-coded by status) ────────────
 function AdminTimeline({ cranes, bookings }: { cranes: Crane[]; bookings: Booking[] }) {
   const pos = (t: string) =>
@@ -167,11 +237,11 @@ function AdminTimeline({ cranes, bookings }: { cranes: Crane[]; bookings: Bookin
   );
 }
 
-// ── Add-booking form (used in both Add tab and standalone) ────────────────────
+// ── Add-booking form ──────────────────────────────────────────────────────────
 function AddBookingForm({
   siteId, cranes, onSuccess, onCancel,
 }: {
-  siteId: string; cranes: Crane[]; onSuccess: () => void; onCancel: () => void;
+  siteId: string; cranes: Crane[]; onSuccess: (msg: string) => void; onCancel: () => void;
 }) {
   const [date, setDate]       = useState('');
   const [craneId, setCraneId] = useState('');
@@ -185,6 +255,12 @@ function AddBookingForm({
   const [err, setErr]         = useState<string | null>(null);
   const [existingApproved, setExistingApproved] = useState<Booking[]>([]);
 
+  // Repeat state
+  const [repeat, setRepeat]           = useState(false);
+  const [repeatType, setRepeatType]   = useState<RepeatType>('week');
+  const [repeatDays, setRepeatDays]   = useState<number[]>([1, 2, 3, 4, 5]);
+  const [repeatEnd, setRepeatEnd]     = useState('');
+
   useEffect(() => {
     if (!craneId || !date) { setExistingApproved([]); return; }
     supabase.from('crane_bookings')
@@ -196,37 +272,71 @@ function AddBookingForm({
   const overlapErr =
     start && end && timeToMins(end) > timeToMins(start) &&
     existingApproved.some(b => overlaps(start, end, b.start_time, b.end_time))
-      ? 'Time overlaps with an existing approved booking.'
+      ? 'Time overlaps with an existing approved booking on the start date.'
       : null;
+
+  function computeDates(): string[] {
+    if (!date) return [];
+    if (!repeat) return [date];
+    switch (repeatType) {
+      case 'week':     return restOfWeekDates(date);
+      case 'weekdays': return specificWeekdayDates(date, repeatDays);
+      case 'range':    return repeatEnd && repeatEnd >= date ? rangeDates(date, repeatEnd) : [];
+      default:         return [date];
+    }
+  }
+
+  const bookingDates = computeDates();
+
+  const previewText = !repeat || bookingDates.length === 0 ? null
+    : bookingDates.length === 1
+    ? `This will create 1 booking on ${fmtD(bookingDates[0])}`
+    : `This will create ${bookingDates.length} bookings from ${fmtD(bookingDates[0])} to ${fmtD(bookingDates[bookingDates.length - 1])}`;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (overlapErr) return;
     if (timeToMins(end) <= timeToMins(start)) { setErr('End time must be after start time.'); return; }
+    if (repeat && repeatType === 'weekdays' && repeatDays.length === 0) { setErr('Select at least one weekday.'); return; }
+    if (bookingDates.length === 0) { setErr('No valid working days found for the selected repeat options.'); return; }
+
     setSaving(true); setErr(null);
-    const { error } = await supabase.from('crane_bookings').insert({
-      site_id: siteId, crane_id: craneId, date,
+
+    const rows = bookingDates.map(d => ({
+      site_id: siteId, crane_id: craneId, date: d,
       start_time: start, end_time: end,
       company, booked_by: by, email,
       notes: notes.trim() || null,
       status: 'approved', created_by: 'ap',
-    });
+    }));
+
+    const { error } = await supabase.from('crane_bookings').insert(rows);
     setSaving(false);
     if (error) { setErr(error.message); return; }
-    onSuccess();
+    onSuccess(rows.length > 1
+      ? `${rows.length} bookings created successfully.`
+      : 'Booking added successfully.');
   }
 
-  // Simple inline timeline for the add form
+  // Inline timeline helpers
   const pos = (t: string) =>
     Math.max(0, Math.min(100, (timeToMins(t) - TL_START) / TL_SPAN * 100));
   const wid = (s: string, e: string) =>
     Math.max(0.5, Math.min(100 - pos(s), (timeToMins(e) - timeToMins(s)) / TL_SPAN * 100));
+
+  const submitLabel = saving
+    ? 'Saving…'
+    : repeat && bookingDates.length > 1
+    ? `Create ${bookingDates.length} Bookings`
+    : 'Add Booking';
 
   return (
     <form onSubmit={submit}>
       <div style={card}>
         <div style={cardTitle}>New Booking <span style={{ color: '#16a34a', fontWeight: 600, textTransform: 'none', letterSpacing: 0 }}>(auto-approved · AP)</span></div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+
+          {/* Date + Crane */}
           <div>
             <label style={labelStyle}>Date *</label>
             <input type="date" required value={date} onChange={e => setDate(e.target.value)} style={inputStyle} />
@@ -263,6 +373,114 @@ function AddBookingForm({
             </div>
           )}
 
+          {/* Repeat toggle */}
+          <div style={{ gridColumn: '1 / -1' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', userSelect: 'none' as const }}>
+              <input
+                type="checkbox"
+                checked={repeat}
+                onChange={e => { setRepeat(e.target.checked); setErr(null); }}
+                style={{ width: '16px', height: '16px', accentColor: BRAND, cursor: 'pointer', flexShrink: 0 }}
+              />
+              <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#374151' }}>Repeat this booking</span>
+            </label>
+          </div>
+
+          {/* Repeat options */}
+          {repeat && (
+            <>
+              {/* Repeat type */}
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={labelStyle}>Repeat Type</label>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' as const }}>
+                  {([
+                    { v: 'week' as RepeatType,     label: 'Rest of week' },
+                    { v: 'weekdays' as RepeatType, label: 'Specific weekdays' },
+                    { v: 'range' as RepeatType,    label: 'Date range' },
+                  ]).map(opt => (
+                    <button key={opt.v} type="button" onClick={() => setRepeatType(opt.v)} style={{
+                      padding: '0.4rem 0.85rem', borderRadius: '6px', border: '2px solid',
+                      fontWeight: 600, fontSize: '0.82rem', cursor: 'pointer',
+                      fontFamily: 'system-ui, sans-serif',
+                      background: repeatType === opt.v ? '#1d4ed8' : '#f9fafb',
+                      color: repeatType === opt.v ? '#fff' : '#374151',
+                      borderColor: repeatType === opt.v ? '#1d4ed8' : '#e5e7eb',
+                    }}>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Weekday checkboxes */}
+              {repeatType === 'weekdays' && (
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={labelStyle}>Repeat on</label>
+                  <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' as const }}>
+                    {WEEKDAYS.map(d => {
+                      const active = repeatDays.includes(d.v);
+                      return (
+                        <button key={d.v} type="button"
+                          onClick={() => setRepeatDays(prev => active ? prev.filter(x => x !== d.v) : [...prev, d.v])}
+                          style={{
+                            padding: '0.35rem 0.75rem', borderRadius: '6px', border: '2px solid',
+                            fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer',
+                            fontFamily: 'system-ui, sans-serif',
+                            background: active ? '#1d4ed8' : '#fff',
+                            color: active ? '#fff' : '#374151',
+                            borderColor: active ? '#1d4ed8' : '#d1d5db',
+                          }}>
+                          {d.l}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: '#6b7280', marginTop: '0.4rem' }}>
+                    Books selected days for 4 weeks from the start date.
+                  </div>
+                </div>
+              )}
+
+              {/* Date range end */}
+              {repeatType === 'range' && (
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={labelStyle}>End Date *</label>
+                  <input type="date" value={repeatEnd} min={date || undefined}
+                    onChange={e => setRepeatEnd(e.target.value)}
+                    style={{ ...inputStyle, maxWidth: '200px' }} />
+                  <div style={{ fontSize: '0.72rem', color: '#6b7280', marginTop: '0.4rem' }}>
+                    Books every working day (Mon–Fri) from the start date to this date.
+                  </div>
+                </div>
+              )}
+
+              {/* Preview */}
+              {date && previewText && (
+                <div style={{
+                  gridColumn: '1 / -1', background: '#eff6ff',
+                  border: '1px solid #bfdbfe', borderRadius: '8px',
+                  padding: '0.65rem 0.9rem', fontSize: '0.85rem',
+                  color: '#1e40af', fontWeight: 600,
+                }}>
+                  {previewText}
+                </div>
+              )}
+
+              {date && repeat && bookingDates.length === 0 && (
+                <div style={{
+                  gridColumn: '1 / -1', background: '#fef3c7',
+                  border: '1px solid #fde68a', borderRadius: '8px',
+                  padding: '0.65rem 0.9rem', fontSize: '0.85rem', color: '#92400e',
+                }}>
+                  {repeatType === 'range' && !repeatEnd
+                    ? 'Select an end date to see the preview.'
+                    : 'No working days found for the selected options.'}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Times */}
           <div>
             <label style={labelStyle}>Start Time *</label>
             <input type="time" required value={start} onChange={e => setStart(e.target.value)} style={inputStyle} />
@@ -310,7 +528,7 @@ function AddBookingForm({
             opacity: saving || !!overlapErr ? 0.7 : 1,
             fontFamily: 'system-ui, sans-serif',
           }}>
-            {saving ? 'Adding…' : 'Add Booking'}
+            {submitLabel}
           </button>
         </div>
       </div>
@@ -607,7 +825,7 @@ function AdminContent() {
           <AddBookingForm
             siteId={siteId}
             cranes={cranes}
-            onSuccess={() => { fetchBookings(); setTab('bookings'); showToast('Booking added successfully.'); }}
+            onSuccess={(msg) => { fetchBookings(); setTab('bookings'); showToast(msg); }}
             onCancel={() => setTab('bookings')}
           />
         )}
