@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
       .from('crane_bookings')
       .insert({
         site_id: site,
-        crane_id: crane,
+        crane,
         date,
         start_time,
         end_time,
@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
     // ── Batch insert repeat copies ───────────────────────────────────────────────
     const copies = repeatDates.map(d => ({
       site_id: site,
-      crane_id: crane,
+      crane,
       date: d,
       start_time,
       end_time,
