@@ -104,11 +104,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // ── Resolve site_id UUID from crane_logs_sites ───────────────────────────────
+    const { data: siteRow } = await supabase
+      .from('crane_logs_sites')
+      .select('id')
+      .eq('site_name', site)
+      .maybeSingle();
+
+    const siteId: string | null = siteRow?.id ?? null;
+
     // ── Insert original booking ──────────────────────────────────────────────────
     const { data: original, error: originalError } = await supabase
       .from('crane_bookings')
       .insert({
-        site_id: site,
+        site_id: siteId,
         crane,
         date,
         start_time,
